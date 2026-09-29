@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shepherd Media Group | Photography & Videography in Kenya</title>
+<meta name="description" content="Professional wedding, ruracio, burial photography, videography and live streaming by Shepherd Media Group. Get an instant quotation.">
+<link rel="icon" href="/img/logo.jpg">
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/"><img src="/img/logo.jpg" alt="SMG logo"><span>Shepherd <b>Media</b> Group</span></a>
+  <button class="burger" aria-label="Menu">☰</button>
+  <nav class="main">
+    <a href="#packages">Packages</a><a href="#gallery">Gallery</a><a href="#about">About</a><a href="#blog">Blog</a>
+    <a class="btn btn-red btn-sm" href="#packages">Get a quote</a>
+  </nav>
+</div></header>
+
+<div class="hero"><div class="wrap">
+  <div>
+    <div class="eyebrow">Photography · Videography · Live streaming</div>
+    <h1>Capturing moments. <em>Telling stories.</em></h1>
+    <p class="lead">From weddings and ruracio to burials and live events, Shepherd Media Group turns your most important days into memories that last.</p>
+    <div class="cta">
+      <a class="btn btn-red" href="#packages">See packages &amp; get a quote</a>
+      <a class="btn btn-ghost" data-wa href="#" target="_blank" rel="noopener">Chat on WhatsApp</a>
+    </div>
+    <div class="trust">
+      <div><b>4</b>Event types covered</div>
+      <div><b>A4</b>Instant downloadable quote</div>
+      <div><b>Live</b>Streaming for family abroad</div>
+    </div>
+  </div>
+  <div class="hero-img">
+    <img src="/img/david.png" alt="David Murith, CEO of Shepherd Media Group">
+    <div class="badge">David Murith · Founder &amp; CEO</div>
+  </div>
+</div></div>
+
+<section id="packages"><div class="wrap">
+  <div class="eyebrow">Our packages</div>
+  <h2>Choose the package that fits your day</h2>
+  <p class="lead">Pick a package, tell us about your event, and download your personalised A4 quotation instantly.</p>
+  <div class="tabs" id="tabs"></div>
+  <div class="grid3" id="pkgs"></div>
+</div></section>
+
+<section id="gallery" class="bg-soft"><div class="wrap">
+  <div class="eyebrow">Gallery</div>
+  <h2>Moments we have captured</h2>
+  <div class="picks" id="picks"></div>
+  <div id="bestWrap" style="margin-bottom:34px"><h3 style="color:var(--blue)">Best memories</h3><div class="best" id="best"></div></div>
+  <div class="gal" id="gal"></div>
+  <div id="videoWrap" style="margin-top:44px"><h3 style="color:var(--blue)">Videos</h3><div class="videos" id="vids"></div></div>
+</div></section>
+
+<section id="about" class="about"><div class="wrap">
+  <img src="/img/david.png" alt="David Murith" loading="lazy">
+  <div>
+    <div class="eyebrow">About us</div>
+    <h2>Meet <span data-s="ceo_name">David Murith</span></h2>
+    <p data-s="about"></p>
+    <div class="services"><div>Weddings</div><div>Ruracio</div><div>Live streaming</div><div>Burial services</div></div>
+    <p style="margin-top:22px"><a class="btn btn-blue" data-wa="Hello David, I would like to book Shepherd Media Group." href="#" target="_blank" rel="noopener">Message David on WhatsApp</a></p>
+  </div>
+</div></section>
+
+<section id="blog" class="bg-soft"><div class="wrap">
+  <div class="eyebrow">From the blog</div>
+  <h2>Stories &amp; tips</h2>
+  <div class="posts" id="posts"></div>
+  <p><a class="btn btn-ghost" href="/blog.html" style="margin-top:20px">All stories</a></p>
+</div></section>
+
+<footer>
+  <div class="bar" style="margin-top:-46px;margin-bottom:46px"></div>
+  <div class="wrap">
+    <div class="cols">
+      <div><h4 data-s="company_name"></h4><p data-s="tagline"></p><p data-s="address"></p></div>
+      <div><h4>Contact</h4><p><a data-tel href="#"><span data-s="phone"></span></a></p><p><a data-wa href="#" target="_blank" rel="noopener">WhatsApp us</a></p><p data-s="email"></p></div>
+      <div><h4>Explore</h4><p><a href="#packages">Packages</a></p><p><a href="#gallery">Gallery</a></p><p><a href="/blog.html">Blog</a></p></div>
+    </div>
+    <div class="copy">© <span id="yr"></span> Shepherd Media Group. All rights reserved.</div>
+  </div>
+</footer>
+
+<a class="wa" data-wa href="#" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">💬 WhatsApp</a>
+
+<div class="overlay" id="quoteModal"><div class="modal">
+  <form id="qForm">
+    <h3>Get your quotation</h3>
+    <p class="lead" style="margin:0">Fill in your details and download your A4 quotation right away.</p>
+    <label>Package</label><select name="package_id" id="qPkg" required></select>
+    <label>Your name</label><input name="client_name" required>
+    <div class="row2">
+      <div><label>Phone / WhatsApp</label><input name="phone" type="tel" required></div>
+      <div><label>Email (optional)</label><input name="email" type="email"></div>
+    </div>
+    <div class="row2">
+      <div><label>Event date</label><input name="event_date" type="date"></div>
+      <div><label>Venue</label><input name="venue"></div>
+    </div>
+    <label>Anything else we should know?</label><textarea name="notes" rows="3"></textarea>
+    <div class="err" id="qErr"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-red" type="submit">Generate quotation</button>
+      <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+    </div>
+  </form>
+  <div class="ok-box" id="qDone" style="display:none">
+    <div class="tick">✓</div>
+    <h3>Your quotation is ready</h3>
+    <p>Reference <b id="qNum"></b></p>
+    <p><a class="btn btn-red" id="qDl" href="#">Download A4 quotation (PDF)</a></p>
+    <p><a class="btn btn-ghost" id="qWa" href="#" target="_blank" rel="noopener">Discuss on WhatsApp</a></p>
+    <p><button class="btn btn-sm btn-ghost" data-close>Close</button></p>
+  </div>
+</div></div>
+
+<div class="overlay" id="lightbox" data-close><img alt=""></div>
+
+<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+<script src="/js/site.js"></script>
+</body>
+</html>
