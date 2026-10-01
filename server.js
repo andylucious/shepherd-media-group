@@ -5,7 +5,8 @@ const db = require('./src/db');
 
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+// Number of proxies in front of the app (Railway / Cloud Run: 1). Raise TRUST_PROXY if all visitors appear to share one address.
+app.set('trust proxy', Number(process.env.TRUST_PROXY || 1));
 // Security headers on every response
 const CSP = [
   "default-src 'self'", "img-src 'self' data: blob:", "media-src 'self' blob:", "style-src 'self' 'unsafe-inline'",
@@ -27,6 +28,11 @@ app.use(require('cookie-parser')());
 const UPLOADS = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(UPLOADS, { maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check for the hosting platform: answers only when the database is reachable
+app.get('/health', async (req, res) => {
+  try { await db.q('SELECT 1'); res.json({ ok: true }); } catch (e) { res.status(503).json({ ok: false }); }
+});
 
 app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 app.use('/api/public', require('./src/routes/public'));

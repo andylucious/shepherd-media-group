@@ -42,7 +42,9 @@ router.get('/packages', wrap(async (req, res) => {
 }));
 
 router.get('/package-categories', wrap(async (req, res) => {
-  const rows = await db.q(`SELECT DISTINCT c.name FROM package_categories c JOIN packages p ON p.category=c.name AND p.active=1 ORDER BY c.sort_order, c.id`);
+  // (no DISTINCT + ORDER BY on a hidden column: MySQL 8 rejects that)
+  const rows = await db.q(`SELECT c.name FROM package_categories c
+    WHERE EXISTS (SELECT 1 FROM packages p WHERE p.category=c.name AND p.active=1) ORDER BY c.sort_order, c.id`);
   res.json(rows.map((r) => r.name));
 }));
 
