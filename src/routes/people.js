@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const docs = require('../docs');
 const crew = require('../crew');
-const { weakPassword } = require('../util');
+const { weakPassword, hashPassword } = require('../util');
 
 const num = (v) => Number(v) || 0;
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
@@ -117,6 +117,17 @@ module.exports = (router, { wrap, adminOnly }) => {
       (SELECT COUNT(*) FROM invoices i JOIN quotes q ON q.id=i.quote_id WHERE q.client_id=c.id) AS invoices
       FROM clients c ORDER BY c.id DESC LIMIT 500`));
   }));
+  // Full details of one client account: profile, their quotations, invoices and receipts. The password is never included.
+  router.get('/clients/:id', adminOnly, wrap(async (req, res) => {
+    const c = await db.one('SELECT id, name, email, phone, active, last_login, created_at FROM clients WHERE id=?', [req.params.id]);
+    if (!c) return res.status(404).json({ error: 'Not found' });
+    const quotes = await db.q('SELECT number, package_name, price, discount, status, event_date, created_at FROM quotes WHERE client_id=? ORDER BY id DESC', [c.id]);
+    const invoices = await db.q(`SELECT i.number, i.package_name, i.amount-i.discount AS total, i.paid, i.status, i.event_date, i.created_at
+      FROM invoices i JOIN quotes q ON q.id=i.quote_id WHERE q.client_id=? ORDER BY i.id DESC`, [c.id]);
+    const receipts = await db.q(`SELECT pa.id, pa.receipt_number, pa.amount, pa.method, pa.paid_at, i.number AS invoice_number
+      FROM payments pa JOIN invoices i ON i.id=pa.invoice_id JOIN quotes q ON q.id=i.quote_id WHERE q.client_id=? ORDER BY pa.paid_at DESC, pa.id DESC`, [c.id]);
+    res.json({ client: c, password: 'Encrypted (bcrypt). It cannot be viewed by anyone.', quotes, invoices, receipts });
+  }));
   router.put('/clients/:id', adminOnly, wrap(async (req, res) => {
     const b = req.body;
     const email = String(b.email || '').trim().toLowerCase();
@@ -127,7 +138,7 @@ module.exports = (router, { wrap, adminOnly }) => {
     if (b.password) {
       const weak = weakPassword(b.password);
       if (weak) return res.status(400).json({ error: weak });
-      await db.q('UPDATE clients SET password_hash=? WHERE id=?', [await bcrypt.hash(String(b.password), 10), req.params.id]);
+      await db.q('UPDATE clients SET password_hash=? WHERE id=?', [await hashPassword(b.password), req.params.id]);
     }
     res.json({ ok: true });
   }));

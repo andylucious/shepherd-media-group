@@ -125,12 +125,14 @@ async function clients() {
   const rows = await A('GET', '/clients');
   $('#main').innerHTML = `<h2>Client accounts</h2>
   <p class="lead" style="margin-top:-8px">People who created an account on the website. They see their own quotations, invoices, receipts and project links. If a client forgets their password, edit the account and set a new one, then send it to them.</p>
+  <div class="cards">${stat(rows.length, 'Client accounts')}${stat(rows.filter((c) => c.active).length, 'Active')}${stat(rows.filter((c) => Date.now() - Date.parse(String(c.created_at).replace(' ', 'T')) < 30 * 864e5).length, 'Joined in last 30 days')}${stat(rows.reduce((n, c) => n + Number(c.invoices), 0), 'Invoices on accounts')}</div>
   <div class="panel"><table><tr><th>Name</th><th>Email</th><th>Phone</th><th>Quotes</th><th>Invoices</th><th>Joined</th><th>Last sign-in</th><th>Status</th><th></th></tr>
   ${rows.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(c.email)}</td><td>${esc(c.phone)}</td><td>${c.quotes}</td><td>${c.invoices}</td><td>${c.created_at.slice(0, 10)}</td><td>${esc(c.last_login || 'Never')}</td>
     <td><span class="pill ${c.active ? 'green' : ''}">${c.active ? 'Active' : 'Disabled'}</span></td>
-    <td><div class="acts"><button class="btn btn-ghost" data-edit="${c.id}">Edit</button>${c.phone ? `<a class="btn btn-ghost" target="_blank" href="${waUrl(c.phone, `Hello ${c.name}, this is Shepherd Media Group.`)}">WhatsApp</a>` : ''}<button class="btn btn-del" data-del="${c.id}">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="9">No client accounts yet.</td></tr>'}</table></div>`;
+    <td><div class="acts"><button class="btn btn-blue" data-view="${c.id}">View details</button><button class="btn btn-ghost" data-edit="${c.id}">Edit</button>${c.phone ? `<a class="btn btn-ghost" target="_blank" href="${waUrl(c.phone, `Hello ${c.name}, this is Shepherd Media Group.`)}">WhatsApp</a>` : ''}<button class="btn btn-del" data-del="${c.id}">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="9">No client accounts yet.</td></tr>'}</table></div>`;
   $('#main').onclick = async (e) => {
     const t = e.target;
+    if (t.dataset.view) clientDetails(t.dataset.view);
     if (t.dataset.del && confirm('Delete this client account? Their quotations stay, but are no longer linked to an account.')) { await A('DELETE', `/clients/${t.dataset.del}`); clients(); }
     if (t.dataset.edit) {
       const c = rows.find((r) => r.id == t.dataset.edit);
@@ -147,4 +149,32 @@ async function clients() {
       };
     }
   };
+}
+
+const detailRow = (k, v) => `<tr><td style="width:38%;color:var(--muted)">${k}</td><td>${v}</td></tr>`;
+const lockNote = '<span class="pill green">Encrypted</span> <small>Stored as a one-way bcrypt hash. It cannot be viewed by anyone, including you. To help someone who forgot it, set a new password.</small>';
+
+async function userDetails(id) {
+  const u = await A('GET', `/users/${id}`);
+  modal(`<h3>${esc(u.name)} <span class="pill ${u.role === 'admin' ? 'red' : ''}">${esc(u.role)}</span></h3>
+    <table>${detailRow('Email', esc(u.email))}${detailRow('Phone', esc(u.phone || '-'))}${detailRow('Status', u.active ? '<span class="pill green">Active</span>' : '<span class="pill">Disabled</span>')}
+    ${detailRow('Created', esc(String(u.created_at).slice(0, 16)))}${detailRow('Last sign-in', esc(u.last_login || 'Never'))}${detailRow('Password', lockNote)}</table>
+    <p style="margin-top:14px"><button class="btn btn-ghost btn-sm" data-close>Close</button></p>`);
+}
+
+async function clientDetails(id) {
+  const d = await A('GET', `/clients/${id}`);
+  const c = d.client;
+  const total = d.invoices.reduce((s, i) => s + Number(i.total), 0);
+  const paid = d.invoices.reduce((s, i) => s + Number(i.paid), 0);
+  modal(`<h3>${esc(c.name)} <span class="pill ${c.active ? 'green' : ''}">${c.active ? 'Active' : 'Disabled'}</span></h3>
+    <table>${detailRow('Email', esc(c.email))}${detailRow('Phone', esc(c.phone || '-'))}${detailRow('Joined', esc(String(c.created_at).slice(0, 16)))}${detailRow('Last sign-in', esc(c.last_login || 'Never'))}${detailRow('Password', lockNote)}</table>
+    <div class="cards" style="grid-template-columns:repeat(3,1fr);margin:14px 0 8px">${stat(kes(total), 'Invoiced')}${stat(kes(paid), 'Paid')}${stat(kes(total - paid), 'Balance', total - paid > 0 ? 'r' : '')}</div>
+    <h4 style="margin:10px 0 4px">Quotations (${d.quotes.length})</h4>
+    <table>${d.quotes.map((q) => `<tr><td>${esc(q.number)}</td><td>${esc(q.package_name)}</td><td>${kes(q.price - q.discount)}</td><td><span class="pill">${esc(q.status)}</span></td></tr>`).join('') || '<tr><td>None</td></tr>'}</table>
+    <h4 style="margin:12px 0 4px">Invoices (${d.invoices.length})</h4>
+    <table>${d.invoices.map((i) => `<tr><td>${esc(i.number)}</td><td>${esc(i.package_name)}</td><td>${kes(i.total)}</td><td>${kes(i.paid)} paid</td><td><span class="pill ${i.status === 'paid' ? 'green' : ''}">${esc(i.status)}</span></td></tr>`).join('') || '<tr><td>None</td></tr>'}</table>
+    <h4 style="margin:12px 0 4px">Receipts the client can download (${d.receipts.length})</h4>
+    <table>${d.receipts.map((r) => `<tr><td>${esc(r.receipt_number)}</td><td>${esc(String(r.paid_at).slice(0, 10))}</td><td>${esc(r.invoice_number)}</td><td>${kes(r.amount)}</td><td><a class="btn btn-ghost btn-sm" href="#" data-viewpdf="/api/admin/payments/${r.id}/receipt" data-title="Receipt ${esc(r.receipt_number)}">View</a></td></tr>`).join('') || '<tr><td>No payments yet</td></tr>'}</table>
+    <p style="margin-top:14px"><button class="btn btn-ghost btn-sm" data-close>Close</button></p>`);
 }

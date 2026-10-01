@@ -4,7 +4,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const pdf = require('../pdf');
-const { secret: SECRET, pv, weakPassword, lock, limiter, bookingStatus } = require('../util');
+const { secret: SECRET, pv, weakPassword, lock, limiter, bookingStatus, hashPassword, needsRehash } = require('../util');
+const { receiptData } = require('../receipts');
+const docs = require('../docs');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 // a real hash to compare against when the account does not exist, so response time does not reveal which emails are registered
@@ -50,7 +52,7 @@ router.post('/register', signupLimit, wrap(async (req, res) => {
   if (weak) return res.status(400).json({ error: weak });
   if (await db.one('SELECT id FROM clients WHERE email=?', [email]))
     return res.status(400).json({ error: 'An account with this email already exists. Try signing in.' });
-  const hash = await bcrypt.hash(String(b.password), 10);
+  const hash = await hashPassword(b.password);
   const r = await db.q('INSERT INTO clients (name, email, phone, password_hash, last_login) VALUES (?,?,?,?,NOW())', [name, email, phone, hash]);
   const c = { id: r.insertId, name, email, phone, password_hash: hash };
   setSession(req, res, c);
@@ -66,6 +68,7 @@ router.post('/login', authLimit, wrap(async (req, res) => {
   const ok = await bcrypt.compare(String((req.body || {}).password || ''), c ? c.password_hash : DUMMY_HASH);
   if (!c || !c.active || !ok) { lock.fail(key); return res.status(401).json({ error: 'Wrong email or password.' }); }
   lock.ok(key);
+  if (needsRehash(c.password_hash)) { c.password_hash = await hashPassword(req.body.password); await db.q('UPDATE clients SET password_hash=? WHERE id=?', [c.password_hash, c.id]); }
   await db.q('UPDATE clients SET last_login=NOW() WHERE id=?', [c.id]);
   setSession(req, res, c);
   res.json(publicClient(c));
@@ -94,7 +97,7 @@ router.post('/password', wrap(async (req, res) => {
   if (!(await bcrypt.compare(String(current), req.client.password_hash))) return res.status(400).json({ error: 'Your current password is wrong.' });
   const weak = weakPassword(next);
   if (weak) return res.status(400).json({ error: weak });
-  const hash = await bcrypt.hash(String(next), 10);
+  const hash = await hashPassword(next);
   await db.q('UPDATE clients SET password_hash=? WHERE id=?', [hash, req.client.id]);
   setSession(req, res, { ...req.client, password_hash: hash });
   res.json({ ok: true });
@@ -115,11 +118,23 @@ router.get('/overview', wrap(async (req, res) => {
       id: i.id, number: i.number, package_name: i.package_name, event_type: i.event_type, event_date: i.event_date, venue: i.venue,
       total, paid: i.paid, balance: Math.max(total - i.paid, 0), status: i.status, due_date: i.due_date,
       booking: bookingStatus({ event_date: i.event_date, completed: !!i.completed_at, delivered: mine.length > 0 }),
-      payments: await db.q('SELECT amount, method, reference, paid_at, receipt_number, token FROM payments WHERE invoice_id=? ORDER BY paid_at, id', [i.id]),
+      payments: await db.q('SELECT id, amount, method, reference, paid_at, receipt_number FROM payments WHERE invoice_id=? ORDER BY paid_at, id', [i.id]),
       projects: mine,
     });
   }
-  res.json({ client: publicClient(req.client), quotes, invoices: out });
+  // every receipt on the account, newest first (this is the "My receipts" list)
+  const receipts = await db.q(`SELECT pa.id, pa.receipt_number, pa.amount, pa.method, pa.reference, pa.paid_at, pa.created_at, i.number AS invoice_number, i.package_name
+    FROM payments pa JOIN invoices i ON i.id=pa.invoice_id JOIN quotes q ON q.id=i.quote_id
+    WHERE q.client_id=? ORDER BY pa.paid_at DESC, pa.id DESC`, [req.client.id]);
+  res.json({ client: publicClient(req.client), quotes, invoices: out, receipts });
+}));
+
+// Download a receipt. Only works for payments on this client's own invoices.
+router.get('/receipts/:id/pdf', wrap(async (req, res) => {
+  const pay = await db.one(`SELECT pa.* FROM payments pa JOIN invoices i ON i.id=pa.invoice_id JOIN quotes q ON q.id=i.quote_id
+    WHERE pa.id=? AND q.client_id=?`, [req.params.id, req.client.id]);
+  if (!pay) return res.status(404).send('Not found');
+  docs.receipt(res, await receiptData(pay), await db.getSettings(), req.query.inline === '1');
 }));
 
 router.get('/invoices/:id/pdf', wrap(async (req, res) => {

@@ -280,7 +280,7 @@ async function init() {
       await pool.query('INSERT INTO users (email, name, password_hash) VALUES (?,?,?)', [
         email.toLowerCase(),
         'David Murith',
-        await bcrypt.hash(pw, 10),
+        await require('./util').hashPassword(pw),
       ]);
       console.log(`Admin created: ${email}`);
     } else console.warn('No admin exists. Set ADMIN_EMAIL and ADMIN_PASSWORD in .env');

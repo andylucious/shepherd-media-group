@@ -19,6 +19,17 @@ body { background: var(--page); }
 .side button.nav { text-align: left; background: none; border: 0; padding: 11px 14px; border-radius: 10px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
 .side button.nav.on { background: var(--blue-soft); color: var(--blue); }
 .side button.nav:hover { color: var(--blue); }
+.side { overflow-y: auto; }
+.grp-head { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; padding: 11px 14px; border-radius: 10px; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; }
+.grp-head:hover { background: var(--blue-soft); }
+.grp-head i { font-style: normal; transition: transform .25s; color: var(--muted); }
+.grp.open .grp-head i { transform: rotate(180deg); }
+.grp.has-active .grp-head { color: var(--blue); }
+.grp-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; }
+.grp.open .grp-body { grid-template-rows: 1fr; }
+.grp-body > .inner { overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+.grp-body .nav { padding-left: 26px; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .grp-body, .grp-head i { transition: none; } }
 main { padding: 26px; min-width: 0; }
 main h2 { margin-bottom: 18px; }
 .bars2 { display: flex; align-items: flex-end; gap: 14px; height: 150px; padding-bottom: 22px; }
@@ -57,7 +68,9 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
 .modal.xl { max-width: 1040px; width: 96vw; }
 #topbar { display: none; }
 @media (max-width: 860px) {
-  .app { grid-template-columns: 1fr; }
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .app > div { min-width: 0; }
+  main h2 { font-size: 1.5rem; }
   .side { position: fixed; z-index: 50; left: -250px; width: 230px; transition: .2s; }
   .side.open { left: 0; }
   #topbar { display: flex; justify-content: space-between; align-items: center; background: var(--surface); padding: 10px 16px; border-bottom: 1px solid var(--line); }
@@ -84,20 +97,45 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
   <aside class="side" id="side">
     <div class="brand"><img src="/img/logo.png" alt=""><span>SMG <b>Admin</b></span></div>
     <button class="nav" data-v="dash">Dashboard</button>
-    <button class="nav" data-v="quotes">Quotes</button>
-    <button class="nav" data-v="bookings">Bookings</button>
-    <button class="nav" data-v="reminders">Reminders</button>
-    <button class="nav" data-v="invoices">Invoices &amp; payments</button>
-    <button class="nav" data-v="payables">Payables</button>
-    <button class="nav" data-v="contractors" data-admin>Contractors</button>
-    <button class="nav" data-v="projects">Client projects</button>
-    <button class="nav" data-v="reports" data-admin>Reports</button>
-    <button class="nav" data-v="packages">Packages</button>
-    <button class="nav" data-v="media">Gallery &amp; videos</button>
-    <button class="nav" data-v="blog">Blog</button>
-    <button class="nav" data-v="visitors">Visitors</button>
-    <button class="nav" data-v="clients" data-admin>Client accounts</button>
-    <button class="nav" data-v="users" data-admin>Staff users</button>
+
+    <div class="grp" data-g="sales">
+      <button class="grp-head" type="button" aria-expanded="false">Sales &amp; jobs <i>&#9662;</i></button>
+      <div class="grp-body"><div class="inner">
+        <button class="nav" data-v="quotes">Quotes</button>
+        <button class="nav" data-v="bookings">Bookings</button>
+        <button class="nav" data-v="reminders">Reminders</button>
+        <button class="nav" data-v="invoices">Invoices &amp; payments</button>
+        <button class="nav" data-v="projects">Client projects</button>
+      </div></div>
+    </div>
+
+    <div class="grp" data-g="money">
+      <button class="grp-head" type="button" aria-expanded="false">Money <i>&#9662;</i></button>
+      <div class="grp-body"><div class="inner">
+        <button class="nav" data-v="payables">Payables</button>
+        <button class="nav" data-v="contractors" data-admin>Contractors</button>
+        <button class="nav" data-v="reports" data-admin>Reports</button>
+      </div></div>
+    </div>
+
+    <div class="grp" data-g="website">
+      <button class="grp-head" type="button" aria-expanded="false">Website <i>&#9662;</i></button>
+      <div class="grp-body"><div class="inner">
+        <button class="nav" data-v="packages">Packages</button>
+        <button class="nav" data-v="media">Gallery &amp; videos</button>
+        <button class="nav" data-v="blog">Blog</button>
+        <button class="nav" data-v="visitors">Visitors</button>
+      </div></div>
+    </div>
+
+    <div class="grp" data-g="people">
+      <button class="grp-head" type="button" aria-expanded="false">Accounts <i>&#9662;</i></button>
+      <div class="grp-body"><div class="inner">
+        <button class="nav" data-v="clients" data-admin>Client accounts</button>
+        <button class="nav" data-v="users" data-admin>Staff users</button>
+      </div></div>
+    </div>
+
     <button class="nav" data-v="settings">Settings</button>
     <span style="flex:1"></span>
     <a class="nav btn-sm" href="/" target="_blank" style="padding:11px 14px;color:var(--muted);font-weight:600">View website ↗</a>

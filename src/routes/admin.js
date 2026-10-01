@@ -9,7 +9,7 @@ const db = require('../db');
 const pdf = require('../pdf');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const { secret: SECRET, pv, weakPassword, lock, limiter } = require('../util');
+const { secret: SECRET, pv, weakPassword, lock, limiter, hashPassword, needsRehash } = require('../util');
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not set: sessions will reset whenever the server restarts.');
 // On Railway point UPLOADS_DIR at the mounted volume (e.g. /data/uploads) so files survive redeploys
 const UPLOADS = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
@@ -39,6 +39,7 @@ router.post('/login', loginLimit, wrap(async (req, res) => {
   const ok = await bcrypt.compare(String(password), u ? u.password_hash : DUMMY_HASH);
   if (!u || !u.active || !ok) { lock.fail(key); return res.status(401).json({ error: 'Wrong email or password' }); }
   lock.ok(key);
+  if (needsRehash(u.password_hash)) { u.password_hash = await hashPassword(password); await db.q('UPDATE users SET password_hash=? WHERE id=?', [u.password_hash, u.id]); }
   await db.q('UPDATE users SET last_login=NOW() WHERE id=?', [u.id]);
   const token = jwt.sign({ id: u.id, pv: pv(u.password_hash) }, SECRET(), { expiresIn: '7d' });
   res.cookie('smg_admin', token, { httpOnly: true, sameSite: 'strict', maxAge: 7 * 864e5, secure: req.secure });
@@ -69,7 +70,7 @@ router.post('/password', wrap(async (req, res) => {
   if (weak) return res.status(400).json({ error: weak });
   const u = await db.one('SELECT * FROM users WHERE id=?', [req.user.id]);
   if (!(await bcrypt.compare(String(current), u.password_hash))) return res.status(400).json({ error: 'Current password is wrong' });
-  const hash = await bcrypt.hash(String(next), 10);
+  const hash = await hashPassword(next);
   await db.q('UPDATE users SET password_hash=? WHERE id=?', [hash, u.id]);
   // every other session is now invalid; keep this one signed in
   res.cookie('smg_admin', jwt.sign({ id: u.id, pv: pv(hash) }, SECRET(), { expiresIn: '7d' }), { httpOnly: true, sameSite: 'strict', maxAge: 7 * 864e5, secure: req.secure });
@@ -265,7 +266,7 @@ router.post('/quotes/:id/invoice', wrap(async (req, res) => {
   res.json({ id: r.insertId, number });
 }));
 
-router.get('/invoices', wrap(async (req, res) => res.json(await db.q('SELECT * FROM invoices ORDER BY id DESC LIMIT 300'))));
+router.get('/invoices', wrap(async (req, res) => res.json(await db.q('SELECT i.*, (q.client_id IS NOT NULL) AS has_account FROM invoices i LEFT JOIN quotes q ON q.id=i.quote_id ORDER BY i.id DESC LIMIT 300'))));
 router.put('/invoices/:id', wrap(async (req, res) => {
   const b = req.body;
   await db.q('UPDATE invoices SET client_name=?, phone=?, email=?, event_date=?, venue=?, package_name=?, items=?, amount=?, discount=?, due_date=?, notes=? WHERE id=?',

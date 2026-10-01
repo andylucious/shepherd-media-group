@@ -75,3 +75,12 @@ const lock = {
 };
 
 Object.assign(module.exports, { secret, pv, weakPassword, lock });
+
+// ---------------------------------------------------------------- password hashing
+// Passwords are never stored: only a salted bcrypt hash (one-way). Nobody, including the admin, can read a password.
+const bcryptjs = require('bcryptjs');
+const ROUNDS = 12;
+const hashPassword = (pw) => bcryptjs.hash(String(pw), ROUNDS);
+// Hashes made with a lower work factor are upgraded the next time the person signs in.
+const needsRehash = (hash) => { try { return bcryptjs.getRounds(String(hash)) < ROUNDS; } catch (e) { return true; } };
+Object.assign(module.exports, { hashPassword, needsRehash, ROUNDS });

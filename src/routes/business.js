@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('../db');
 
-const { today, weakPassword } = require('../util');
+const { today, weakPassword, hashPassword } = require('../util');
 const crypto2 = require('crypto');
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
 const num = (v) => Number(v) || 0;
@@ -149,6 +149,12 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
   router.get('/users', adminOnly, wrap(async (req, res) => {
     res.json(await db.q('SELECT id, name, email, phone, role, active, last_login, created_at FROM users ORDER BY id'));
   }));
+  router.get('/users/:id', adminOnly, wrap(async (req, res) => {
+    // the password hash is never sent out; only whether a password is set
+    const u = await db.one('SELECT id, name, email, phone, role, active, last_login, created_at, LEFT(password_hash, 4) AS hash_kind FROM users WHERE id=?', [req.params.id]);
+    if (!u) return res.status(404).json({ error: 'Not found' });
+    res.json({ ...u, password: 'Encrypted (bcrypt). It cannot be viewed by anyone.', hash_kind: undefined });
+  }));
   router.post('/users', adminOnly, wrap(async (req, res) => {
     const b = req.body;
     const email = String(b.email || '').toLowerCase().trim();
@@ -156,7 +162,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     if (weakPassword(b.password)) return res.status(400).json({ error: weakPassword(b.password) });
     if (await db.one('SELECT id FROM users WHERE email=?', [email])) return res.status(400).json({ error: 'That email already has an account' });
     const r = await db.q('INSERT INTO users (email, name, phone, role, password_hash) VALUES (?,?,?,?,?)', [
-      email, String(b.name).slice(0, 120), String(b.phone || '').slice(0, 40), ROLES.includes(b.role) ? b.role : 'staff', await bcrypt.hash(String(b.password), 10)]);
+      email, String(b.name).slice(0, 120), String(b.phone || '').slice(0, 40), ROLES.includes(b.role) ? b.role : 'staff', await hashPassword(b.password)]);
     res.json({ id: r.insertId });
   }));
   router.put('/users/:id', adminOnly, wrap(async (req, res) => {
@@ -171,7 +177,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     await db.q('UPDATE users SET name=?, email=?, phone=?, role=?, active=? WHERE id=?', [String(b.name).slice(0, 120), email, String(b.phone || '').slice(0, 40), role, active, id]);
     if (b.password) {
       if (weakPassword(b.password)) return res.status(400).json({ error: weakPassword(b.password) });
-      await db.q('UPDATE users SET password_hash=? WHERE id=?', [await bcrypt.hash(String(b.password), 10), id]);
+      await db.q('UPDATE users SET password_hash=? WHERE id=?', [await hashPassword(b.password), id]);
     }
     res.json({ ok: true });
   }));

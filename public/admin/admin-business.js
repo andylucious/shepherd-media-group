@@ -19,6 +19,7 @@ async function paymentsModal(kind, id, title, total, refresh, ctx) {
   modal(`<h3>${esc(title)}</h3>
     <div class="cards" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">${stat(kes(total), 'Total')}${stat(kes(paid), kind === 'invoices' ? 'Received' : 'Paid')}${stat(kes(balance), 'Balance', 'r')}</div>
     ${payRows(list, kind === 'invoices' ? 'payments' : 'payable-payments', kind === 'invoices' ? ctx : null)}
+    ${kind === 'invoices' && ctx && ctx.account && list.length ? '<p class="lead" style="font-size:.85rem;margin:8px 0 0"><span class="pill green">On client account</span> Each receipt also appears in the client\'s account, where they can download it.</p>' : ''}
     ${balance > 0 ? `<h3 style="margin-top:16px;font-size:1.05rem">Record a ${kind === 'invoices' ? 'payment received' : 'payment made'}</h3><form id="pf">
       <div class="row2">${fld('Amount (KES)', 'amount', balance, 'number', 'step="any" min="1" required')}${fld('Date', 'paid_at', today(), 'date')}</div>
       <div class="row2">${sel('Method', 'method', METHODS, 'M-Pesa')}${fld('Reference (e.g. M-Pesa code)', 'reference')}</div>
@@ -53,7 +54,7 @@ async function invoices() {
     if (t.dataset.del && confirm('Delete this invoice and its payment records? The quote becomes editable again.')) { await A('DELETE', `/invoices/${t.dataset.del}`); invoices(); }
     if (t.dataset.pay) {
       const i = rows.find((r) => r.id == t.dataset.pay);
-      paymentsModal('invoices', i.id, `${i.number} · ${i.client_name}`, i.amount - i.discount, () => invoices(), { phone: i.phone, client: i.client_name });
+      paymentsModal('invoices', i.id, `${i.number} · ${i.client_name}`, i.amount - i.discount, () => invoices(), { phone: i.phone, client: i.client_name, account: !!i.has_account });
     }
     if (t.dataset.edit) {
       const i = rows.find((r) => r.id == t.dataset.edit);
@@ -188,12 +189,13 @@ async function users() {
   const rows = await A('GET', '/users');
   $('#main').innerHTML = `<h2>Users</h2>
   <p class="lead" style="margin-top:-8px"><b>Admin</b> can do everything. <b>Staff</b> can handle quotes, invoices, payments, bills, gallery, blog and client projects, but cannot see reports, manage users or change company settings.</p>
+  <div class="cards">${stat(rows.length, 'Staff accounts')}${stat(rows.filter((u) => u.role === 'admin').length, 'Admins')}${stat(rows.filter((u) => u.role === 'staff').length, 'Staff')}${stat(rows.filter((u) => !u.active).length, 'Disabled')}</div>
   <p><button class="btn btn-red" id="add">+ Add user</button></p>
   <div class="panel"><table><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>Created</th><th></th></tr>
   ${rows.map((u) => `<tr><td>${esc(u.name)}${u.id === ME.id ? ' <small>(you)</small>' : ''}</td><td>${esc(u.email)}</td><td>${esc(u.phone)}</td>
     <td><span class="pill ${u.role === 'admin' ? 'red' : ''}">${esc(u.role)}</span></td><td><span class="pill ${u.active ? 'green' : ''}">${u.active ? 'Active' : 'Disabled'}</span></td>
     <td>${esc(u.last_login || 'Never')}</td><td>${u.created_at.slice(0, 10)}</td>
-    <td><div class="acts"><button class="btn btn-ghost" data-edit="${u.id}">Edit</button>${u.id === ME.id ? '' : `<button class="btn btn-del" data-del="${u.id}">Delete</button>`}</div></td></tr>`).join('')}</table></div>`;
+    <td><div class="acts"><button class="btn btn-blue" data-view="${u.id}">View details</button><button class="btn btn-ghost" data-edit="${u.id}">Edit</button>${u.id === ME.id ? '' : `<button class="btn btn-del" data-del="${u.id}">Delete</button>`}</div></td></tr>`).join('')}</table></div>`;
   const form = (u = {}) => {
     modal(`<h3>${u.id ? 'Edit' : 'New'} user</h3><form id="ef">
       ${fld('Full name', 'name', u.name, 'text', 'required')}${fld('Email (used to sign in)', 'email', u.email, 'email', 'required')}${fld('Phone', 'phone', u.phone)}
@@ -210,6 +212,7 @@ async function users() {
   $('#main').onclick = async (e) => {
     const t = e.target;
     if (t.dataset.edit) form(rows.find((r) => r.id == t.dataset.edit));
+    if (t.dataset.view) userDetails(t.dataset.view);
     if (t.dataset.del && confirm('Delete this user?')) { await A('DELETE', `/users/${t.dataset.del}`); users(); }
   };
 }

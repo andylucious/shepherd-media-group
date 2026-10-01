@@ -34,9 +34,36 @@ $('#menu').onclick = () => $('#side').classList.toggle('open');
 const views = { dash, quotes, invoices, bookings, reminders, payables, contractors, clients, projects, reports, users, packages, media, blog, visitors, settings };
 let ME = {};
 let current = 'dash';
+// ---- sliding side menu ----
+const GKEY = 'smg-admin-groups';
+const savedGroups = () => { try { return JSON.parse(localStorage.getItem(GKEY)) || ['sales']; } catch (e) { return ['sales']; } };
+function setGroup(g, open) {
+  g.classList.toggle('open', open);
+  g.querySelector('.grp-head').setAttribute('aria-expanded', open);
+  try {
+    const set = new Set(savedGroups());
+    open ? set.add(g.dataset.g) : set.delete(g.dataset.g);
+    localStorage.setItem(GKEY, JSON.stringify([...set]));
+  } catch (e) { /* storage may be blocked */ }
+}
+document.querySelectorAll('.grp').forEach((g) => {
+  const open = savedGroups().includes(g.dataset.g);
+  g.classList.toggle('open', open);
+  g.querySelector('.grp-head').setAttribute('aria-expanded', open);
+  g.querySelector('.grp-head').onclick = () => setGroup(g, !g.classList.contains('open'));
+});
+function syncMenu(v) {
+  document.querySelectorAll('.grp').forEach((g) => {
+    const has = !!g.querySelector(`.nav[data-v="${v}"]`);
+    g.classList.toggle('has-active', has);
+    if (has && !g.classList.contains('open')) setGroup(g, true); // slide open the group of the page you are on
+  });
+}
+
 async function go(v) {
   current = v;
   document.querySelectorAll('.side .nav[data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+  syncMenu(v);
   $('#side').classList.remove('open');
   $('#main').innerHTML = '<p>Loading…</p>';
   try { await views[v](); } catch (e) { if (e.message !== 'auth') $('#main').innerHTML = '<p>Could not load this page.</p>'; }
@@ -45,6 +72,8 @@ document.querySelectorAll('.side .nav[data-v]').forEach((b) => (b.onclick = () =
 async function start() {
   ME = await A('GET', '/me');
   document.querySelectorAll('[data-admin]').forEach((b) => b.classList.toggle('hidden', ME.role !== 'admin'));
+  // a group with nothing the signed-in person may use is hidden completely
+  document.querySelectorAll('.grp').forEach((g) => g.classList.toggle('hidden', ![...g.querySelectorAll('.nav[data-v]')].some((b) => !b.classList.contains('hidden'))));
   if (ME.role !== 'admin' && ['reports', 'users', 'contractors', 'clients'].includes(current)) current = 'dash';
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); go(current);
 }

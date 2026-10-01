@@ -19,6 +19,9 @@
 .money b { display: block; font-size: 1.1rem; color: var(--ink); }
 .money span { font-size: .78rem; color: var(--muted); }
 .rows a { display: inline-block; margin: 4px 8px 4px 0; }
+.rc { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line); }
+.rc:first-child { border-top: 0; }
+.rcr { display: flex; align-items: center; gap: 14px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .authbox { max-width: 460px; margin: 0 auto; }
 .switch { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -63,6 +66,9 @@
     <div class="eyebrow">Client area</div>
     <h2 id="hello"></h2>
     <p><button class="btn btn-ghost btn-sm" id="logout">Sign out</button> <a class="btn btn-red btn-sm" href="/#packages">Request a new quote</a></p>
+    <div id="newReceipts"></div>
+    <h3 style="color:var(--blue)" id="receiptsTitle">My receipts</h3>
+    <div id="receipts"></div>
     <h3 style="color:var(--blue)">Bookings &amp; invoices</h3>
     <div id="bookings"></div>
     <h3 style="color:var(--blue)">Quotations</h3>
@@ -122,6 +128,7 @@ $('#pwForm').onsubmit = async (e) => { e.preventDefault(); $('#pwErr').textConte
 const stChip = (b) => b.code === 'completed' ? '<span class="chip green">Completed</span>'
   : b.code === 'in_progress' ? '<span class="chip">In progress</span>' : `<span class="chip red">Booked${b.date ? ' · ' + esc(nice(b.date)) : ''}</span>`;
 
+let showAllReceipts = false;
 async function load() {
   let o;
   try { o = await capi('/overview'); } catch (e) { return showGuest(); }
@@ -133,17 +140,29 @@ async function load() {
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>${esc(i.package_name)}</h3><small class="lead">${esc(i.number)}${i.event_date ? ' · ' + esc(nice(i.event_date)) : ''}${i.venue ? ' · ' + esc(i.venue) : ''}</small></div><div>${stChip(i.booking)}</div></div>
       <div class="money"><div><b>${fmt(i.total)}</b><span>Total</span></div><div><b>${fmt(i.paid)}</b><span>Paid</span></div><div><b>${fmt(i.balance)}</b><span>Balance${i.due_date && i.balance > 0 ? ' · due ' + esc(nice(i.due_date)) : ''}</span></div></div>
       <div class="rows"><a class="btn btn-ghost btn-sm" href="/api/client/invoices/${i.id}/pdf">Invoice (PDF)</a>
-        ${i.payments.map((p) => `<a class="btn btn-ghost btn-sm" href="/api/public/receipts/${esc(p.token)}/pdf">Receipt ${esc(p.receipt_number)} · ${fmt(p.amount)}</a>`).join('')}
+        ${i.payments.map((p) => `<a class="btn btn-ghost btn-sm" href="/api/client/receipts/${p.id}/pdf">Receipt ${esc(p.receipt_number)} · ${fmt(p.amount)}</a>`).join('')}
         ${i.projects.map((p) => `<a class="btn btn-blue btn-sm" data-view="${p.id}" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Open: ${esc(p.title)} ↗</a>`).join('')}
         ${i.balance > 0 ? `<a class="btn btn-red btn-sm" target="_blank" rel="noopener" href="${waLink('Hello, I would like to pay the balance for invoice ' + i.number)}">Pay / ask about balance</a>` : ''}</div>
       ${i.projects.length ? '' : (i.booking.code === 'completed' ? '' : '<p class="lead" style="font-size:.88rem;margin:8px 0 0">Your photos and videos will appear here when they are ready.</p>')}
     </div>`).join('') || '<div class="empty">No bookings yet. When your quotation is confirmed it appears here as a booking.</div>';
+  // receipts: newest first, with a "New" tag for payments recorded in the last 7 days
+  const fresh = (r) => Date.now() - Date.parse(String(r.created_at).replace(' ', 'T')) < 7 * 864e5;
+  const newCount = o.receipts.filter(fresh).length;
+  $('#newReceipts').innerHTML = newCount ? `<div class="status mid"><b>You have ${newCount} new receipt${newCount > 1 ? 's' : ''}.</b> <small>Download ${newCount > 1 ? 'them' : 'it'} below.</small></div>` : '';
+  $('#receiptsTitle').textContent = `My receipts (${o.receipts.length})`;
+  $('#receipts').innerHTML = o.receipts.length ? `<div class="cardx" style="padding:4px 16px">
+    ${o.receipts.map((r, n) => `<div class="rc" style="${n >= 8 && !showAllReceipts ? 'display:none' : ''}">
+      <div><b>${esc(r.receipt_number)}</b> ${fresh(r) ? '<span class="chip red">New</span>' : ''}<br>
+        <small class="lead">${esc(nice(String(r.paid_at).slice(0, 10)))} · ${esc(r.package_name)} · ${esc(r.invoice_number)}<br>${esc(r.method)}${r.reference ? ' · ' + esc(r.reference) : ''}</small></div>
+      <div class="rcr"><b>${fmt(r.amount)}</b><a class="btn btn-blue btn-sm" href="/api/client/receipts/${r.id}/pdf">Download</a></div></div>`).join('')}
+    ${o.receipts.length > 8 ? `<p style="text-align:center;margin:8px 0"><button class="btn btn-ghost btn-sm" id="allR">${showAllReceipts ? 'Show fewer' : `Show all ${o.receipts.length} receipts`}</button></p>` : ''}</div>`
+    : '<div class="empty">Your receipts appear here after each payment you make. You can download them any time.</div>';
   $('#quotes').innerHTML = o.quotes.filter((q) => !q.invoice_id).map((q) => `
     <div class="cardx" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
       <div><b>${esc(q.package_name)}</b> <small class="lead">${esc(q.number)} · ${esc(String(q.created_at).slice(0, 10))}</small><br><span class="lead">${fmt(q.price - q.discount)}</span></div>
       <a class="btn btn-ghost btn-sm" href="/api/public/quotes/${esc(q.token)}/pdf">Download quotation</a></div>`).join('') || '<div class="empty">No open quotations.</div>';
 }
-document.addEventListener('click', (e) => { const a = e.target.closest('[data-view]'); if (a) fetch(`/api/client/projects/${a.dataset.view}/viewed`, { method: 'POST' }).catch(() => {}); });
+document.addEventListener('click', (e) => { if (e.target.id === 'allR') { showAllReceipts = !showAllReceipts; load(); return; } const a = e.target.closest('[data-view]'); if (a) fetch(`/api/client/projects/${a.dataset.view}/viewed`, { method: 'POST' }).catch(() => {}); });
 load();
 </script>
 </body>
