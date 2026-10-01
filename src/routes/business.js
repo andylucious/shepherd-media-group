@@ -8,6 +8,40 @@ const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
 const num = (v) => Number(v) || 0;
 
 module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
+  // ---- package categories ---------------------------------------------------
+  const catName = (v) => String(v || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  router.get('/categories', wrap(async (req, res) => {
+    res.json(await db.q(`SELECT c.id, c.name, c.sort_order, COUNT(p.id) packages
+      FROM package_categories c LEFT JOIN packages p ON p.category = c.name GROUP BY c.id ORDER BY c.sort_order, c.id`));
+  }));
+  router.post('/categories', wrap(async (req, res) => {
+    const name = catName(req.body.name);
+    if (!name) return res.status(400).json({ error: 'Enter a category name' });
+    if (await db.one('SELECT id FROM package_categories WHERE name=?', [name])) return res.status(400).json({ error: 'That category already exists' });
+    const { n } = await db.one('SELECT COALESCE(MAX(sort_order),0)+1 n FROM package_categories');
+    const r = await db.q('INSERT INTO package_categories (name, sort_order) VALUES (?,?)', [name, n]);
+    res.json({ id: r.insertId, name });
+  }));
+  router.put('/categories/:id', wrap(async (req, res) => {
+    const name = catName(req.body.name);
+    const old = await db.one('SELECT name FROM package_categories WHERE id=?', [req.params.id]);
+    if (!old) return res.status(404).json({ error: 'Not found' });
+    if (!name) return res.status(400).json({ error: 'Enter a category name' });
+    if (await db.one('SELECT id FROM package_categories WHERE name=? AND id<>?', [name, req.params.id])) return res.status(400).json({ error: 'That category already exists' });
+    await db.q('UPDATE package_categories SET name=?, sort_order=COALESCE(?, sort_order) WHERE id=?',
+      [name, req.body.sort_order === undefined || req.body.sort_order === '' ? null : Number(req.body.sort_order) || 0, req.params.id]);
+    await db.q('UPDATE packages SET category=? WHERE category=?', [name, old.name]);
+    res.json({ ok: true });
+  }));
+  router.delete('/categories/:id', wrap(async (req, res) => {
+    const c = await db.one('SELECT name FROM package_categories WHERE id=?', [req.params.id]);
+    if (!c) return res.json({ ok: true });
+    const { n } = await db.one('SELECT COUNT(*) n FROM packages WHERE category=?', [c.name]);
+    if (n) return res.status(400).json({ error: `${n} package(s) still use "${c.name}". Move or delete them first.` });
+    await db.q('DELETE FROM package_categories WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  }));
+
   // ---- invoice payments (partial payments) ------------------------------
   router.get('/invoices/:id/payments', wrap(async (req, res) => {
     res.json(await db.q('SELECT * FROM payments WHERE invoice_id=? ORDER BY paid_at DESC, id DESC', [req.params.id]));

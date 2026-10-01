@@ -27,9 +27,9 @@ function bindShell() {
 // ---- packages + quote ----
 let packages = [];
 let cat = '';
+let cats = [];
 function renderPackages() {
-  const cats = [...new Set(packages.map((p) => p.category))];
-  if (!cat) cat = cats[0];
+  if (!cats.includes(cat)) cat = cats[0];
   $('#tabs').innerHTML = cats.map((c) => `<button class="tab ${c === cat ? 'on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
   $('#pkgs').innerHTML = packages.filter((p) => p.category === cat).map((p) => `
     <div class="pkg ${p.popular ? 'pop' : ''}">
@@ -118,7 +118,7 @@ document.addEventListener('click', (e) => {
 });
 
 async function initHome() {
-  packages = await api('/packages');
+  [packages, cats] = await Promise.all([api('/packages'), api('/package-categories')]);
   renderPackages();
   $('#qForm').addEventListener('submit', submitQuote);
   loadGallery(); loadPosts(3);

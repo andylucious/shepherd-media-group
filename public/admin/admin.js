@@ -114,9 +114,11 @@ async function quotes() {
 }
 
 // ---- packages ----
+let PKG_CATS = [];
 async function packages() {
-  const rows = await A('GET', '/packages');
-  $('#main').innerHTML = `<h2>Packages</h2><p><button class="btn btn-red" id="add">+ Add package</button></p><div class="panel"><table>
+  const [rows, catRows] = await Promise.all([A('GET', '/packages'), A('GET', '/categories')]);
+  PKG_CATS = catRows.map((c) => c.name);
+  $('#main').innerHTML = `<h2>Packages</h2><p><button class="btn btn-red" id="add">+ Add package</button> <button class="btn btn-ghost" id="cats">Manage categories</button></p><div class="panel"><table>
   <tr><th></th><th>Category</th><th>Name</th><th>Price</th><th>Shown</th><th></th></tr>
   ${rows.map((p) => `<tr><td>${p.image ? `<img src="${esc(p.image)}" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:6px">` : ''}</td><td>${esc(p.category)}</td><td>${esc(p.name)} ${p.popular ? '<span class="pill red">popular</span>' : ''}</td><td>${kes(p.price)}</td>
     <td>${p.active ? 'Yes' : 'Hidden'}</td>
@@ -124,7 +126,7 @@ async function packages() {
   </table></div>`;
   const form = (p = {}) => {
     modal(`<h3>${p.id ? 'Edit' : 'New'} package</h3><form id="ef">
-      ${sel('Category', 'category', CATS, p.category)}${fld('Name', 'name', p.name, 'text', 'required')}${fld('Tagline', 'tagline', p.tagline)}
+      ${sel('Category', 'category', PKG_CATS, p.category)}${fld('Name', 'name', p.name, 'text', 'required')}${fld('Tagline', 'tagline', p.tagline)}
       ${fld('Price (KES)', 'price', p.price ?? 0, 'number', 'step="any" required')}${area('What is included (one item per line)', 'features', p.features, 8)}
       <label>Package image ${p.image ? '(leave empty to keep current)' : ''}</label>
       ${p.image ? `<img src="${esc(p.image)}" alt="" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-bottom:6px"><label style="font-weight:400"><input type="checkbox" name="remove_image" value="1" style="width:auto"> Remove current image</label>` : ''}
@@ -141,6 +143,7 @@ async function packages() {
       await A(p.id ? 'PUT' : 'POST', p.id ? `/packages/${p.id}` : '/packages', d); closeModal(); toast('Saved'); packages();
     };
   };
+  $('#cats').onclick = () => categoriesModal(catRows);
   $('#add').onclick = () => form();
   $('#main').onclick = async (e) => {
     const t = e.target;
@@ -235,4 +238,25 @@ async function settings() {
     <p><button class="btn btn-blue">Update password</button></p></form></div></div>`;
   $('#sf').onsubmit = async (e) => { e.preventDefault(); await A('PUT', '/settings', formData(e.target)); toast('Settings saved'); };
   $('#pf').onsubmit = async (e) => { e.preventDefault(); await A('POST', '/password', formData(e.target)); e.target.reset(); toast('Password updated'); };
+}
+
+async function categoriesModal(list) {
+  modal(`<h3>Package categories</h3>
+    <p class="lead" style="margin-top:0">These become the tabs on the Packages section of the website. Renaming a category updates its packages.</p>
+    <table>${list.map((c) => `<tr><td>${esc(c.name)}<br><small>${c.packages} package(s)</small></td>
+      <td><div class="acts" style="justify-content:flex-end"><button class="btn btn-ghost" data-ren="${c.id}">Rename</button><button class="btn btn-del" data-delc="${c.id}">Delete</button></div></td></tr>`).join('')}</table>
+    <form id="cf" style="display:flex;gap:10px;margin-top:14px"><input name="name" placeholder="New category, e.g. Birthday" required><button class="btn btn-red">Add</button></form>
+    <p style="margin-top:12px"><button class="btn btn-ghost" data-close>Done</button></p>`);
+  const reload = async () => { await packages(); categoriesModal(await A('GET', '/categories')); };
+  $('#cf').onsubmit = async (e) => { e.preventDefault(); await A('POST', '/categories', formData(e.target)); toast('Category added'); reload(); };
+  document.querySelectorAll('#ovc [data-ren]').forEach((b) => (b.onclick = async () => {
+    const c = list.find((x) => x.id == b.dataset.ren);
+    const name = prompt('New name', c.name);
+    if (!name || name === c.name) return;
+    await A('PUT', `/categories/${c.id}`, { name }); toast('Renamed'); reload();
+  }));
+  document.querySelectorAll('#ovc [data-delc]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('Delete this category?')) return;
+    await A('DELETE', `/categories/${b.dataset.delc}`); toast('Deleted'); reload();
+  }));
 }

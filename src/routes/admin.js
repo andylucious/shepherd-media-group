@@ -145,8 +145,10 @@ router.delete('/media/:id', wrap(async (req, res) => {
 
 // ---- packages ---------------------------------------------------------
 router.get('/packages', wrap(async (req, res) => res.json(await db.q('SELECT * FROM packages ORDER BY sort_order, id'))));
+const knownCategory = (name) => db.one('SELECT id FROM package_categories WHERE name=?', [String(name || '')]);
 router.post('/packages', upload.single('image'), wrap(async (req, res) => {
   if (!req.body.name) return res.status(400).json({ error: 'Name is required' });
+  if (!(await knownCategory(req.body.category))) return res.status(400).json({ error: 'Choose a category (add one under Manage categories)' });
   const r = await db.q('INSERT INTO packages (category,name,tagline,price,features,popular,active,sort_order,image) VALUES (?,?,?,?,?,?,?,?,?)',
     [...pkgFields(req.body), req.file ? `/uploads/images/${req.file.filename}` : '']);
   res.json({ id: r.insertId });
@@ -154,6 +156,7 @@ router.post('/packages', upload.single('image'), wrap(async (req, res) => {
 router.put('/packages/:id', upload.single('image'), wrap(async (req, res) => {
   const old = await db.one('SELECT image FROM packages WHERE id=?', [req.params.id]);
   if (!old) return res.status(404).json({ error: 'Not found' });
+  if (!(await knownCategory(req.body.category))) return res.status(400).json({ error: 'Choose a category (add one under Manage categories)' });
   let image = old.image;
   if (req.file) { unlinkUpload(old.image); image = `/uploads/images/${req.file.filename}`; }
   else if (req.body.remove_image === '1') { unlinkUpload(old.image); image = ''; }

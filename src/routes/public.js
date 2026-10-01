@@ -33,6 +33,11 @@ router.get('/packages', wrap(async (req, res) => {
   res.json(await db.q('SELECT * FROM packages WHERE active=1 ORDER BY sort_order, id'));
 }));
 
+router.get('/package-categories', wrap(async (req, res) => {
+  const rows = await db.q(`SELECT DISTINCT c.name FROM package_categories c JOIN packages p ON p.category=c.name AND p.active=1 ORDER BY c.sort_order, c.id`);
+  res.json(rows.map((r) => r.name));
+}));
+
 router.get('/gallery', wrap(async (req, res) => {
   const params = [];
   let where = "type='image'";

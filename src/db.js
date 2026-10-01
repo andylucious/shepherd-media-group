@@ -46,6 +46,11 @@ const SCHEMA = [
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS package_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(40) NOT NULL UNIQUE,
+    sort_order INT DEFAULT 0
+  ) DEFAULT CHARSET=utf8mb4`,
   `CREATE TABLE IF NOT EXISTS media (
     id INT AUTO_INCREMENT PRIMARY KEY,
     type VARCHAR(10) NOT NULL,
@@ -253,6 +258,13 @@ async function init() {
         [category, name, tagline, price, features, popular, i++]
       );
   }
+  // categories: the four defaults plus any category already used by a package
+  let order = 0;
+  for (const c of ['Wedding', 'Ruracio', 'Livestreaming', 'Burial'])
+    await pool.query('INSERT IGNORE INTO package_categories (name, sort_order) VALUES (?,?)', [c, order++]);
+  const used = await pool.query('SELECT DISTINCT category FROM packages');
+  for (const r of used[0])
+    await pool.query('INSERT IGNORE INTO package_categories (name, sort_order) VALUES (?,?)', [r.category, order++]);
   return pool;
 }
 
