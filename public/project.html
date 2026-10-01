@@ -31,14 +31,24 @@
 <a class="wa" data-wa href="#" target="_blank" rel="noopener">💬 WhatsApp</a>
 <script src="/js/site.js"></script>
 <script>
-function show(list) {
-  $('#res').innerHTML = list.length ? list.map((p) => `
+function statusBanner(st) {
+  if (!st) return '';
+  const nice = (d) => { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } };
+  const text = st.code === 'completed' ? 'Completed. Your project is ready.'
+    : st.code === 'in_progress' ? 'In progress. We are working on your photos and videos and will share them soon.'
+    : st.date ? `Booked for ${nice(st.date)}${st.in ? ' (' + st.in + ')' : ''}. We look forward to your day!` : 'Booked. We will confirm your event date with you.';
+  const cls = st.code === 'completed' ? 'ok' : st.code === 'in_progress' ? 'mid' : 'new';
+  return `<div class="status ${cls}"><small>${esc(st.package || '')}</small><b>${text}</b></div>`;
+}
+function show(data) {
+  const list = data.projects || [];
+  $('#res').innerHTML = statusBanner(data.status) + (list.length ? list.map((p) => `
     <div class="pkg" style="margin-bottom:16px">
       <h3>${esc(p.title)}</h3>
       <div class="tag">${esc(p.client_name)} · ${esc(String(p.created_at).slice(0, 10))}</div>
       ${p.note ? `<p>${esc(p.note)}</p>` : ''}
       <a class="btn btn-blue" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Open my project ↗</a>
-    </div>`).join('') : '<div class="empty">No project has been shared with you yet. We will message you when it is ready.</div>';
+    </div>`).join('') : (data.status && data.status.code !== 'completed' ? '' : '<div class="empty">No project has been shared with you yet. We will message you when it is ready.</div>'));
 }
 $('#pf').addEventListener('submit', async (e) => {
   e.preventDefault(); $('#pe').textContent = '';

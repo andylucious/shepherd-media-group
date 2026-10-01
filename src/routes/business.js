@@ -3,7 +3,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('../db');
 
-const today = () => new Date().toISOString().slice(0, 10);
+const { today } = require('../util');
+const crypto2 = require('crypto');
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
 const num = (v) => Number(v) || 0;
 
@@ -54,10 +55,11 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     if (amount <= 0) return res.status(400).json({ error: 'Enter an amount greater than zero' });
     const balance = inv.amount - inv.discount - inv.paid;
     if (amount > balance + 0.005) return res.status(400).json({ error: `This is more than the balance (${balance.toLocaleString()})` });
-    await db.q('INSERT INTO payments (invoice_id, amount, method, reference, note, paid_at) VALUES (?,?,?,?,?,?)', [
+    const receipt = await db.nextNumber('payments', 'SMG-R', 'receipt_number');
+    const r = await db.q('INSERT INTO payments (invoice_id, amount, method, reference, note, paid_at, receipt_number, token) VALUES (?,?,?,?,?,?,?,?)', [
       req.params.id, amount, String(req.body.method || 'M-Pesa').slice(0, 30), String(req.body.reference || '').slice(0, 80),
-      String(req.body.note || '').slice(0, 255), isDate(req.body.paid_at) ? req.body.paid_at : today()]);
-    res.json({ ok: true, status: await syncInvoice(req.params.id) });
+      String(req.body.note || '').slice(0, 255), isDate(req.body.paid_at) ? req.body.paid_at : today(), receipt, crypto2.randomBytes(20).toString('hex')]);
+    res.json({ ok: true, status: await syncInvoice(req.params.id), payment_id: r.insertId, receipt_number: receipt });
   }));
 
   router.delete('/payments/:id', adminOnly, wrap(async (req, res) => {
@@ -186,8 +188,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     return [from, to];
   };
 
-  router.get('/reports', adminOnly, wrap(async (req, res) => {
-    const [from, to] = range(req);
+  async function buildSummary(from, to) {
     const first = async (sql, p) => Object.values((await db.one(sql, p)) || { n: 0 })[0] || 0;
     const invoiced = await first('SELECT COALESCE(SUM(amount-discount),0) FROM invoices WHERE DATE(created_at) BETWEEN ? AND ?', [from, to]);
     const collected = await first('SELECT COALESCE(SUM(amount),0) FROM payments WHERE paid_at BETWEEN ? AND ?', [from, to]);
@@ -216,11 +217,21 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     const quotes = await first('SELECT COUNT(*) FROM quotes WHERE DATE(created_at) BETWEEN ? AND ?', [from, to]);
     const quotesInvoiced = await first('SELECT COUNT(*) FROM quotes WHERE invoice_id IS NOT NULL AND DATE(created_at) BETWEEN ? AND ?', [from, to]);
 
-    res.json({ from, to, invoiced, collected, expenses, net: collected - expenses, receivable, payable, overdueRecv, overduePay,
-      byMonth, byType, topClients, expByCat, quotes, quotesInvoiced });
+    return { from, to, invoiced, collected, expenses, net: collected - expenses, receivable, payable, overdueRecv, overduePay,
+      byMonth, byType, topClients, expByCat, quotes, quotesInvoiced };
+  }
+  router.get('/reports', adminOnly, wrap(async (req, res) => {
+    const [from, to] = range(req);
+    res.json(await buildSummary(from, to));
   }));
+  require('./reports')(router, { wrap, adminOnly, buildSummary, range });
 
-  const csvCell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  // cells starting with = + - @ are prefixed so Excel never runs a client-typed name as a formula
+  const csvCell = (v) => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   router.get('/reports/csv', adminOnly, wrap(async (req, res) => {
     const [from, to] = range(req);
     let head, rows;

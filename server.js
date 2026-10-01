@@ -4,7 +4,8 @@ const path = require('path');
 const db = require('./src/db');
 
 const app = express();
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
+app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin'); next(); });
 app.use(express.json({ limit: '2mb' }));
 app.use(require('cookie-parser')());
 

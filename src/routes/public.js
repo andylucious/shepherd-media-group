@@ -2,12 +2,19 @@ const router = require('express').Router();
 const crypto = require('crypto');
 const db = require('../db');
 const pdf = require('../pdf');
+const docs = require('../docs');
+const { receiptData } = require('../receipts');
+const { bookingStatus, limiter } = require('../util');
+
+const formLimit = limiter({ windowMs: 60 * 60 * 1000, max: 12, message: 'Too many requests from this connection. Please try again in an hour, or message us on WhatsApp.' });
+const lookupLimit = limiter({ windowMs: 15 * 60 * 1000, max: 20 });
+const lightLimit = limiter({ windowMs: 60 * 1000, max: 60 });
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ---- visitor tracking -------------------------------------------------
 const BOT = /bot|crawl|spider|slurp|preview|monitor|curl|wget/i;
-router.post('/track', wrap(async (req, res) => {
+router.post('/track', lightLimit, wrap(async (req, res) => {
   const ua = req.get('user-agent') || '';
   if (BOT.test(ua)) return res.json({ ok: true });
   const path = String(req.body.path || '/').slice(0, 250);
@@ -52,13 +59,13 @@ router.get('/videos', wrap(async (req, res) => {
   res.json(await db.q("SELECT * FROM media WHERE type='video' ORDER BY id DESC LIMIT 50"));
 }));
 
-router.post('/media/:id/like', wrap(async (req, res) => {
+router.post('/media/:id/like', lightLimit, wrap(async (req, res) => {
   await db.q('UPDATE media SET likes=likes+1 WHERE id=?', [req.params.id]);
   const m = await db.one('SELECT id, likes FROM media WHERE id=?', [req.params.id]);
   res.json(m || {});
 }));
 
-router.post('/media/:id/view', wrap(async (req, res) => {
+router.post('/media/:id/view', lightLimit, wrap(async (req, res) => {
   await db.q('UPDATE media SET views=views+1 WHERE id=?', [req.params.id]);
   res.json({ ok: true });
 }));
@@ -96,7 +103,7 @@ router.get('/posts/:slug', wrap(async (req, res) => {
 }));
 
 // ---- quotes -----------------------------------------------------------
-router.post('/quotes', wrap(async (req, res) => {
+router.post('/quotes', formLimit, wrap(async (req, res) => {
   const b = req.body || {};
   const name = String(b.client_name || '').trim();
   const phone = String(b.phone || '').trim();
@@ -110,10 +117,16 @@ router.post('/quotes', wrap(async (req, res) => {
     `INSERT INTO quotes (number, token, client_name, phone, email, event_type, event_date, venue, package_id, package_name, items, price, notes)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [number, token, name.slice(0, 160), phone.slice(0, 40), String(b.email || '').slice(0, 190), pkg.category,
-      String(b.event_date || '').slice(0, 20), String(b.venue || '').slice(0, 255), pkg.id, pkg.name, pkg.features, pkg.price,
+      /^\d{4}-\d{2}-\d{2}$/.test(String(b.event_date || '')) ? b.event_date : '', String(b.venue || '').slice(0, 255), pkg.id, pkg.name, pkg.features, pkg.price,
       String(b.notes || '').slice(0, 2000)]
   );
   res.json({ id: r.insertId, number, download: `/api/public/quotes/${token}/pdf` });
+}));
+
+router.get('/receipts/:token/pdf', wrap(async (req, res) => {
+  const pay = await db.one('SELECT * FROM payments WHERE token=?', [req.params.token]);
+  if (!pay) return res.status(404).send('Receipt not found');
+  docs.receipt(res, await receiptData(pay), await db.getSettings(), req.query.inline === '1');
 }));
 
 router.get('/quotes/:token/pdf', wrap(async (req, res) => {
@@ -125,23 +138,39 @@ router.get('/quotes/:token/pdf', wrap(async (req, res) => {
 // ---- client project links ----------------------------------------------
 const last9 = (p) => String(p || '').replace(/\D/g, '').slice(-9);
 const projectOut = (p) => ({ title: p.title, url: p.url, note: p.note, client_name: p.client_name, created_at: p.created_at });
+const countViews = (rows) => rows.length && db.q(
+  'UPDATE projects SET views=views+1, first_viewed_at=COALESCE(first_viewed_at, NOW()) WHERE id IN (?)', [rows.map((r) => r.id)]);
+
+// status of the booking behind a quotation / invoice number: Booked (date), In progress, Completed
+async function statusFor(ref) {
+  const inv = (await db.one('SELECT i.* FROM invoices i WHERE i.number=?', [ref]))
+    || (await db.one('SELECT i.* FROM invoices i JOIN quotes q ON q.id=i.quote_id WHERE q.number=?', [ref]));
+  if (!inv) return null;
+  const q = inv.quote_id ? await db.one('SELECT number FROM quotes WHERE id=?', [inv.quote_id]) : null;
+  const delivered = (await db.one(
+    "SELECT COUNT(*) n FROM projects WHERE quote_number<>'' AND (quote_number=? OR quote_number=?)", [inv.number, q ? q.number : inv.number])).n > 0;
+  const st = bookingStatus({ event_date: inv.event_date, completed: !!inv.completed_at, delivered });
+  return { code: st.code, label: st.label, date: st.date || inv.event_date || '', in: st.in || '', package: inv.package_name, invoice: inv.number };
+}
 
 // direct link shared by the admin
-router.get('/projects/:token', wrap(async (req, res) => {
+router.get('/projects/:token', lightLimit, wrap(async (req, res) => {
   const p = await db.one('SELECT * FROM projects WHERE token=?', [req.params.token]);
   if (!p) return res.status(404).json({ error: 'Project not found' });
-  res.json([projectOut(p)]);
+  await countViews([p]);
+  res.json({ status: p.quote_number ? await statusFor(p.quote_number) : null, projects: [projectOut(p)] });
 }));
 
-// client finds their projects with a quotation/invoice number plus the phone number they used
-router.post('/projects/lookup', wrap(async (req, res) => {
+// client finds their project with a quotation/invoice number plus the phone number they used
+router.post('/projects/lookup', lookupLimit, wrap(async (req, res) => {
   const ref = String(req.body.reference || '').trim().toUpperCase();
   const phone = last9(req.body.phone);
   if (!ref || phone.length < 9) return res.status(400).json({ error: 'Enter your reference number and phone number.' });
   const doc = (await db.one('SELECT phone FROM quotes WHERE number=?', [ref])) || (await db.one('SELECT phone FROM invoices WHERE number=?', [ref]));
   if (!doc || last9(doc.phone) !== phone) return res.status(404).json({ error: 'We could not match that reference and phone number.' });
   const rows = (await db.q('SELECT * FROM projects ORDER BY id DESC')).filter((p) => last9(p.phone) === phone || p.quote_number.toUpperCase() === ref);
-  res.json(rows.map(projectOut));
+  await countViews(rows);
+  res.json({ status: await statusFor(ref), projects: rows.map(projectOut) });
 }));
 
 module.exports = router;

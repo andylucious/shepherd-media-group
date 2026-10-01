@@ -31,7 +31,7 @@ $('#lf').addEventListener('submit', async (e) => {
 $('#logout').onclick = async () => { await A('POST', '/logout'); showLogin(); };
 $('#menu').onclick = () => $('#side').classList.toggle('open');
 
-const views = { dash, quotes, invoices, payables, projects, reports, users, packages, media, blog, visitors, settings };
+const views = { dash, quotes, invoices, bookings, reminders, payables, projects, reports, users, packages, media, blog, visitors, settings };
 let ME = {};
 let current = 'dash';
 async function go(v) {
@@ -61,11 +61,24 @@ async function dash() {
     ${stat(s.newQuotes, 'New quotes', 'r')}${stat(kes(s.unpaid), 'Unpaid invoices', 'r')}${stat(s.photos, 'Photos')}${stat(s.videos, 'Videos')}</div>
   <div class="panel"><h3>Page views, last 14 days</h3>
     <div class="bars" style="margin-bottom:26px">${s.days.map((d) => `<div style="height:${(d.views / max) * 100}%" title="${d.views} views, ${d.visitors} visitors"><i>${d.d.slice(5)}</i></div>`).join('') || '<span class="lead">No visits yet.</span>'}</div></div>
+  <div class="panel" id="attn"></div>
   <div class="two">
     <div class="panel"><h3>Top pages</h3><table>${s.topPages.map((p) => `<tr><td>${esc(p.path)}</td><td>${p.views}</td></tr>`).join('') || '<tr><td>No data yet</td></tr>'}</table></div>
     <div class="panel"><h3>Devices &amp; sources</h3><table>${s.devices.map((p) => `<tr><td>${esc(p.device)}</td><td>${p.n} visitors</td></tr>`).join('')}
       ${s.referrers.map((p) => `<tr><td>${esc(p.referrer.slice(0, 40))}</td><td>${p.n}</td></tr>`).join('')}</table></div>
   </div>`;
+  attention().catch(() => {});
+}
+
+async function attention() {
+  const r = await A('GET', '/reminders');
+  const el = $('#attn');
+  if (!el) return;
+  const n = r.payments.length + r.shoots.length;
+  el.innerHTML = `<h3>Needs attention</h3><div class="cards" style="margin-bottom:8px">${stat(r.payments.length, 'Payments to chase', r.payments.length ? 'r' : '')}${stat(r.shoots.length, 'Shoots in 7 days')}${stat(r.inProgress.length, 'Jobs in progress')}</div>
+    ${n ? `<p style="margin:0">${r.shoots.slice(0, 3).map((b) => `<span class="pill red">${esc(b.event_date)}</span> ${esc(b.client_name)} - ${esc(b.package_name)}`).join('<br>')}</p>` : ''}
+    <p style="margin:10px 0 0"><button class="btn btn-red btn-sm" data-go="reminders">Open reminders</button> <button class="btn btn-ghost btn-sm" data-go="bookings">View bookings</button></p>`;
+  el.onclick = (e) => { if (e.target.dataset.go) go(e.target.dataset.go); };
 }
 
 // ---- generic form builder ----
@@ -210,6 +223,7 @@ async function media() {
     const category = e.target.category.value;
     const title = e.target.title.value;
     const BATCH = 8;
+    const skipped = [];
     const grand = files.reduce((s, f) => s + f.size, 0) || 1;
     let doneBytes = 0, uploaded = 0;
     $('#ub').disabled = true; $('#bar').classList.remove('hidden');
@@ -220,13 +234,14 @@ async function media() {
         const fd = new FormData();
         fd.append('category', category); fd.append('title', title);
         part.forEach((f) => fd.append('files', f));
-        await uploadBatch(fd, (loaded) => {
+        const resp = await uploadBatch(fd, (loaded) => {
           $('#barin').style.width = Math.min(100, ((doneBytes + Math.min(loaded, partBytes)) / grand) * 100) + '%';
           $('#up').textContent = `${uploaded + part.length > files.length ? files.length : Math.min(i + BATCH, files.length)} of ${files.length}`;
         });
-        doneBytes += partBytes; uploaded += part.length;
+        doneBytes += partBytes; uploaded += resp.uploaded;
+        skipped.push(...(resp.skipped || []));
       }
-      toast(`${uploaded} uploaded`);
+      toast(skipped.length ? `${uploaded} uploaded. Skipped (use JPG/PNG/MP4): ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '...' : ''}` : `${uploaded} uploaded`);
       media();
     } catch (er) {
       toast(`${er.message}. ${uploaded} of ${files.length} were uploaded.`);

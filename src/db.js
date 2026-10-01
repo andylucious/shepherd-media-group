@@ -222,6 +222,13 @@ async function init() {
     if (!c) await pool.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
   };
   await addColumn('packages', 'image', "VARCHAR(255) DEFAULT ''");
+  await addColumn('payments', 'receipt_number', "VARCHAR(30) NULL");
+  await addColumn('payments', 'token', "VARCHAR(48) NULL");
+  await addColumn('invoices', 'completed_at', 'TIMESTAMP NULL DEFAULT NULL');
+  await addColumn('invoices', 'last_reminded_at', 'TIMESTAMP NULL DEFAULT NULL');
+  await addColumn('invoices', 'event_reminded_at', 'TIMESTAMP NULL DEFAULT NULL');
+  await addColumn('projects', 'views', 'INT NOT NULL DEFAULT 0');
+  await addColumn('projects', 'first_viewed_at', 'TIMESTAMP NULL DEFAULT NULL');
   await addColumn('users', 'role', "VARCHAR(20) NOT NULL DEFAULT 'admin'");
   await addColumn('users', 'phone', "VARCHAR(40) DEFAULT ''");
   await addColumn('users', 'active', 'TINYINT(1) NOT NULL DEFAULT 1');
@@ -246,6 +253,14 @@ async function init() {
     } else console.warn('No admin exists. Set ADMIN_EMAIL and ADMIN_PASSWORD in .env');
   }
 
+  // every payment gets a receipt number and a private download token
+  const crypto = require('crypto');
+  const [noReceipt] = await pool.query('SELECT id FROM payments WHERE receipt_number IS NULL OR token IS NULL ORDER BY id');
+  for (const r of noReceipt) {
+    const num = await nextNumber('payments', 'SMG-R', 'receipt_number');
+    await pool.query('UPDATE payments SET receipt_number=COALESCE(receipt_number, ?), token=COALESCE(token, ?) WHERE id=?',
+      [num, crypto.randomBytes(20).toString('hex'), r.id]);
+  }
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS))
     await pool.query('INSERT IGNORE INTO settings (k, v) VALUES (?,?)', [k, v]);
 
@@ -277,8 +292,9 @@ async function getSettings() {
 }
 
 // Sequential document numbers like SMG-Q-0007
-async function nextNumber(table, prefix) {
-  const [[{ n }]] = await pool.query(`SELECT COALESCE(MAX(id),0)+1 n FROM ${table}`);
+async function nextNumber(table, prefix, col = 'number') {
+  const [[{ n }]] = await pool.query(
+    `SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(${col}, '-', -1) AS UNSIGNED)),0)+1 n FROM ${table} WHERE ${col} LIKE ?`, [prefix + '-%']);
   return `${prefix}-${String(n).padStart(4, '0')}`;
 }
 

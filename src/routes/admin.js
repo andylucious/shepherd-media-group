@@ -9,7 +9,11 @@ const db = require('../db');
 const pdf = require('../pdf');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const SECRET = () => process.env.JWT_SECRET || 'dev-secret-change-me';
+// Without JWT_SECRET a random one is made for this run (everyone is signed out on restart) rather than using a known default.
+const RUN_SECRET = crypto.randomBytes(32).toString('hex');
+if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not set: sessions will reset whenever the server restarts.');
+const SECRET = () => process.env.JWT_SECRET || RUN_SECRET;
+const loginLimit = require('../util').limiter({ windowMs: 15 * 60 * 1000, max: 15, message: 'Too many sign-in attempts. Wait 15 minutes and try again.' });
 // On Railway point UPLOADS_DIR at the mounted volume (e.g. /data/uploads) so files survive redeploys
 const UPLOADS = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 
@@ -25,7 +29,7 @@ async function syncInvoice(id) {
 }
 
 // ---- auth -------------------------------------------------------------
-router.post('/login', wrap(async (req, res) => {
+router.post('/login', loginLimit, wrap(async (req, res) => {
   const { email = '', password = '' } = req.body || {};
   const u = await db.one('SELECT * FROM users WHERE email=?', [String(email).toLowerCase().trim()]);
   if (!u || !u.active || !(await bcrypt.compare(String(password), u.password_hash)))
@@ -103,18 +107,29 @@ const pkgFields = (b) => [
   Number(b.price) || 0, String(b.features || ''), flag(b.popular, 0), flag(b.active, 1), Number(b.sort_order) || 0,
 ];
 // ---- uploads (photos + videos) ---------------------------------------
+// The file extension comes from the verified type, never from the uploaded file name
+// (a file named x.html must not be stored and served as a web page). SVG, HEIC and HEIF are excluded:
+// SVG can carry scripts and browsers cannot show HEIC photos, so ask for JPG or PNG instead.
+const EXT = {
+  'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif',
+  'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'video/x-matroska': '.mkv', 'video/3gpp': '.3gp',
+};
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(UPLOADS, file.mimetype.startsWith('video/') ? 'videos' : 'images');
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + crypto.randomBytes(4).toString('hex') + path.extname(file.originalname).toLowerCase()),
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + crypto.randomBytes(4).toString('hex') + EXT[file.mimetype]),
 });
 const upload = multer({
   storage,
   limits: { fileSize: 800 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^(image|video)\//.test(file.mimetype)),
+  fileFilter: (req, file, cb) => {
+    if (EXT[file.mimetype]) return cb(null, true);
+    (req.rejected = req.rejected || []).push(file.originalname);
+    cb(null, false);
+  },
 });
 
 const unlinkUpload = (rel) => { if (rel) fs.unlink(path.join(UPLOADS, rel.replace(/^\/?uploads\//, '')), () => {}); };
@@ -128,14 +143,17 @@ router.get('/media', wrap(async (req, res) => {
 router.post('/media', upload.array('files', 100), wrap(async (req, res) => {
   const category = String(req.body.category || 'general').slice(0, 40);
   const title = String(req.body.title || '').slice(0, 190);
-  if (!req.files || !req.files.length) return res.status(400).json({ error: 'Choose photos or videos (image/* or video/*)' });
+  if (!req.files || !req.files.length) {
+    if (req.rejected) return res.json({ uploaded: 0, skipped: req.rejected });
+    return res.status(400).json({ error: 'Choose photos or videos first' });
+  }
   for (const f of req.files) {
     const isVideo = f.mimetype.startsWith('video/');
     await db.q('INSERT INTO media (type,category,title,file) VALUES (?,?,?,?)', [
       isVideo ? 'video' : 'image', category, title || path.parse(f.originalname).name.slice(0, 190),
       `/uploads/${isVideo ? 'videos' : 'images'}/${f.filename}`]);
   }
-  res.json({ uploaded: req.files.length });
+  res.json({ uploaded: req.files.length, skipped: req.rejected || [] });
 }));
 router.put('/media/:id', wrap(async (req, res) => {
   await db.q('UPDATE media SET title=?, category=? WHERE id=?', [String(req.body.title || '').slice(0, 190), String(req.body.category || 'general').slice(0, 40), req.params.id]);

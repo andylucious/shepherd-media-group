@@ -17,7 +17,7 @@ Photos and videos are stored in `uploads/`; on Cloud Run use a Cloud Storage buc
 
 ## Back office
 Quotes, invoices with part payments, payables (bills you owe), client project links (shown to clients under "My project"),
-reports (CSV export), users (admin / staff), gallery, packages, blog, visitors, settings. Light and dark theme on the site and back office.
+receipts for every payment (A4 PDF, sent to clients by WhatsApp link), bookings (Booked / In progress / Completed), reminders, A4 PDF reports (download or print) with CSV export, users (admin / staff), gallery, packages, blog, visitors, settings. Light and dark theme on the site and back office.
 
 ## API
 - Public: `/api/public/{settings,packages,gallery,videos,picks,posts,quotes}`
