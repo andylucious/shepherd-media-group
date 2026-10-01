@@ -160,6 +160,11 @@ async function init() {
 
   for (const sql of SCHEMA) await pool.query(sql);
 
+  // migrations for databases created before a column existed
+  const [[{ c: hasImg }]] = await pool.query(
+    "SELECT COUNT(*) c FROM information_schema.columns WHERE table_schema=? AND table_name='packages' AND column_name='image'", [dbName]);
+  if (!hasImg) await pool.query("ALTER TABLE packages ADD COLUMN image VARCHAR(255) DEFAULT ''");
+
   const [[{ n: userCount }]] = await pool.query('SELECT COUNT(*) n FROM users');
   if (!userCount) {
     const email = process.env.ADMIN_EMAIL;

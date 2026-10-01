@@ -34,6 +34,7 @@ function renderPackages() {
   $('#pkgs').innerHTML = packages.filter((p) => p.category === cat).map((p) => `
     <div class="pkg ${p.popular ? 'pop' : ''}">
       ${p.popular ? '<span class="pop-tag">Most popular</span>' : ''}
+      ${p.image ? `<img class="pimg" loading="lazy" src="${esc(p.image)}" alt="${esc(p.name)}">` : ''}
       <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tagline)}</div>
       <div class="price">${kes(p.price)}</div>
       <ul>${p.features.split('\n').filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>

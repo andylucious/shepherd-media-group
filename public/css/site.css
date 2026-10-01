@@ -59,6 +59,7 @@ nav.main a:hover { color: var(--red); }
 .pkg:hover { box-shadow: var(--shadow); transform: translateY(-3px); }
 .pkg.pop { border: 2px solid var(--red); }
 .pkg .pop-tag { position: absolute; top: -12px; right: 18px; background: var(--red); color: #fff; font-size: .75rem; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+.pkg .pimg { width: calc(100% + 52px); margin: -26px -26px 16px; height: 170px; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; }
 .pkg h3 { color: var(--blue); margin-bottom: 2px; }
 .pkg .tag { color: var(--muted); font-size: .9rem; margin-bottom: 12px; }
 .pkg .price { font-size: 1.9rem; font-weight: 800; color: var(--red); }

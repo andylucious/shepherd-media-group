@@ -143,8 +143,8 @@ async function invoices() {
 async function packages() {
   const rows = await A('GET', '/packages');
   $('#main').innerHTML = `<h2>Packages</h2><p><button class="btn btn-red" id="add">+ Add package</button></p><div class="panel"><table>
-  <tr><th>Category</th><th>Name</th><th>Price</th><th>Shown</th><th></th></tr>
-  ${rows.map((p) => `<tr><td>${esc(p.category)}</td><td>${esc(p.name)} ${p.popular ? '<span class="pill red">popular</span>' : ''}</td><td>${kes(p.price)}</td>
+  <tr><th></th><th>Category</th><th>Name</th><th>Price</th><th>Shown</th><th></th></tr>
+  ${rows.map((p) => `<tr><td>${p.image ? `<img src="${esc(p.image)}" alt="" style="width:54px;height:40px;object-fit:cover;border-radius:6px">` : ''}</td><td>${esc(p.category)}</td><td>${esc(p.name)} ${p.popular ? '<span class="pill red">popular</span>' : ''}</td><td>${kes(p.price)}</td>
     <td>${p.active ? 'Yes' : 'Hidden'}</td>
     <td><div class="acts"><button class="btn btn-ghost" data-edit="${p.id}">Edit</button><button class="btn btn-del" data-del="${p.id}">Delete</button></div></td></tr>`).join('')}
   </table></div>`;
@@ -152,13 +152,18 @@ async function packages() {
     modal(`<h3>${p.id ? 'Edit' : 'New'} package</h3><form id="ef">
       ${sel('Category', 'category', CATS, p.category)}${fld('Name', 'name', p.name, 'text', 'required')}${fld('Tagline', 'tagline', p.tagline)}
       ${fld('Price (KES)', 'price', p.price ?? 0, 'number', 'step="any" required')}${area('What is included (one item per line)', 'features', p.features, 8)}
+      <label>Package image ${p.image ? '(leave empty to keep current)' : ''}</label>
+      ${p.image ? `<img src="${esc(p.image)}" alt="" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-bottom:6px"><label style="font-weight:400"><input type="checkbox" name="remove_image" value="1" style="width:auto"> Remove current image</label>` : ''}
+      <input type="file" name="image" accept="image/*">
       <div class="row2">${fld('Sort order', 'sort_order', p.sort_order ?? 0, 'number')}
       <div><label>Options</label><label style="font-weight:400"><input type="checkbox" name="popular" style="width:auto" ${p.popular ? 'checked' : ''}> Mark as most popular</label>
       <label style="font-weight:400"><input type="checkbox" name="active" style="width:auto" ${p.active !== 0 ? 'checked' : ''}> Show on website</label></div></div>
       <div style="margin-top:14px;display:flex;gap:10px"><button class="btn btn-red">Save</button><button type="button" class="btn btn-ghost" data-close>Cancel</button></div></form>`);
     $('#ef').onsubmit = async (ev) => {
       ev.preventDefault();
-      const d = formData(ev.target); d.popular = !!ev.target.popular.checked; d.active = !!ev.target.active.checked;
+      const d = new FormData(ev.target);
+      d.set('popular', ev.target.popular.checked ? '1' : '0'); d.set('active', ev.target.active.checked ? '1' : '0');
+      if (!d.get('image').size) d.delete('image');
       await A(p.id ? 'PUT' : 'POST', p.id ? `/packages/${p.id}` : '/packages', d); closeModal(); toast('Saved'); packages();
     };
   };

@@ -77,26 +77,11 @@ router.put('/settings', wrap(async (req, res) => {
   res.json(await db.getSettings());
 }));
 
-// ---- packages ---------------------------------------------------------
-router.get('/packages', wrap(async (req, res) => res.json(await db.q('SELECT * FROM packages ORDER BY sort_order, id'))));
+const flag = (v, dflt) => (v === undefined ? dflt : v === true || v === '1' || v === 'true' || v === 'on' || v === 1 ? 1 : 0);
 const pkgFields = (b) => [
   String(b.category || 'Wedding').slice(0, 40), String(b.name || '').slice(0, 160), String(b.tagline || '').slice(0, 255),
-  Number(b.price) || 0, String(b.features || ''), b.popular ? 1 : 0, b.active === false || b.active === 0 ? 0 : 1, Number(b.sort_order) || 0,
+  Number(b.price) || 0, String(b.features || ''), flag(b.popular, 0), flag(b.active, 1), Number(b.sort_order) || 0,
 ];
-router.post('/packages', wrap(async (req, res) => {
-  if (!req.body.name) return res.status(400).json({ error: 'Name is required' });
-  const r = await db.q('INSERT INTO packages (category,name,tagline,price,features,popular,active,sort_order) VALUES (?,?,?,?,?,?,?,?)', pkgFields(req.body));
-  res.json({ id: r.insertId });
-}));
-router.put('/packages/:id', wrap(async (req, res) => {
-  await db.q('UPDATE packages SET category=?,name=?,tagline=?,price=?,features=?,popular=?,active=?,sort_order=? WHERE id=?', [...pkgFields(req.body), req.params.id]);
-  res.json({ ok: true });
-}));
-router.delete('/packages/:id', wrap(async (req, res) => {
-  await db.q('DELETE FROM packages WHERE id=?', [req.params.id]);
-  res.json({ ok: true });
-}));
-
 // ---- uploads (photos + videos) ---------------------------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -134,6 +119,31 @@ router.put('/media/:id', wrap(async (req, res) => {
 router.delete('/media/:id', wrap(async (req, res) => {
   const m = await db.one('SELECT file FROM media WHERE id=?', [req.params.id]);
   if (m) { unlinkUpload(m.file); await db.q('DELETE FROM media WHERE id=?', [req.params.id]); }
+  res.json({ ok: true });
+}));
+
+
+// ---- packages ---------------------------------------------------------
+router.get('/packages', wrap(async (req, res) => res.json(await db.q('SELECT * FROM packages ORDER BY sort_order, id'))));
+router.post('/packages', upload.single('image'), wrap(async (req, res) => {
+  if (!req.body.name) return res.status(400).json({ error: 'Name is required' });
+  const r = await db.q('INSERT INTO packages (category,name,tagline,price,features,popular,active,sort_order,image) VALUES (?,?,?,?,?,?,?,?,?)',
+    [...pkgFields(req.body), req.file ? `/uploads/images/${req.file.filename}` : '']);
+  res.json({ id: r.insertId });
+}));
+router.put('/packages/:id', upload.single('image'), wrap(async (req, res) => {
+  const old = await db.one('SELECT image FROM packages WHERE id=?', [req.params.id]);
+  if (!old) return res.status(404).json({ error: 'Not found' });
+  let image = old.image;
+  if (req.file) { unlinkUpload(old.image); image = `/uploads/images/${req.file.filename}`; }
+  else if (req.body.remove_image === '1') { unlinkUpload(old.image); image = ''; }
+  await db.q('UPDATE packages SET category=?,name=?,tagline=?,price=?,features=?,popular=?,active=?,sort_order=?,image=? WHERE id=?',
+    [...pkgFields(req.body), image, req.params.id]);
+  res.json({ ok: true });
+}));
+router.delete('/packages/:id', wrap(async (req, res) => {
+  const p = await db.one('SELECT image FROM packages WHERE id=?', [req.params.id]);
+  if (p) { unlinkUpload(p.image); await db.q('DELETE FROM packages WHERE id=?', [req.params.id]); }
   res.json({ ok: true });
 }));
 
