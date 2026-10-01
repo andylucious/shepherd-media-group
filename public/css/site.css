@@ -30,7 +30,7 @@ section { padding: 72px 0; }
 header.top { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 70px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--blue); }
-.brand img { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; }
+.brand img { height: 44px; width: auto; object-fit: contain; }
 .brand span b { color: var(--red); }
 nav.main { display: flex; gap: 22px; align-items: center; }
 nav.main a { font-weight: 600; font-size: .95rem; color: var(--ink); }

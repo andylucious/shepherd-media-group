@@ -5,7 +5,7 @@ const BLUE = '#1f4ca3';
 const RED = '#e4471b';
 const INK = '#1c2333';
 const MUTED = '#667085';
-const LOGO = path.join(__dirname, '..', 'public', 'img', 'logo.jpg');
+const LOGO = path.join(__dirname, '..', 'public', 'img', 'logo.png');
 
 const money = (n) => 'KES ' + Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const lines = (t) => String(t || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
@@ -26,7 +26,7 @@ function build(res, filename, kind, doc, s) {
   pdf.rect(W * 0.6, 0, W * 0.4, 8).fill(RED);
 
   // header: logo + company
-  try { pdf.image(LOGO, M, 28, { width: 84 }); } catch (e) { /* logo optional */ }
+  try { pdf.image(LOGO, M, 30, { width: 88 }); } catch (e) { /* logo optional */ }
   pdf.fillColor(BLUE).font('Helvetica-Bold').fontSize(17).text(s.company_name, M + 100, 36, { width: 250 });
   pdf.fillColor(RED).font('Helvetica-Oblique').fontSize(9).text(s.tagline || '', M + 100, 58, { width: 250 });
   pdf.fillColor(MUTED).font('Helvetica').fontSize(9)
