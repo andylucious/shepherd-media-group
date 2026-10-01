@@ -119,8 +119,13 @@ const upload = multer({
 
 const unlinkUpload = (rel) => { if (rel) fs.unlink(path.join(UPLOADS, rel.replace(/^\/?uploads\//, '')), () => {}); };
 
-router.get('/media', wrap(async (req, res) => res.json(await db.q('SELECT * FROM media ORDER BY id DESC LIMIT 500'))));
-router.post('/media', upload.array('files', 40), wrap(async (req, res) => {
+router.get('/media', wrap(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 60, 1), 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const total = (await db.one('SELECT COUNT(*) n FROM media')).n;
+  res.json({ total, items: await db.q('SELECT * FROM media ORDER BY id DESC LIMIT ? OFFSET ?', [limit, offset]) });
+}));
+router.post('/media', upload.array('files', 100), wrap(async (req, res) => {
   const category = String(req.body.category || 'general').slice(0, 40);
   const title = String(req.body.title || '').slice(0, 190);
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'Choose photos or videos (image/* or video/*)' });

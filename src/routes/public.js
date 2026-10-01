@@ -38,11 +38,14 @@ router.get('/package-categories', wrap(async (req, res) => {
   res.json(rows.map((r) => r.name));
 }));
 
+// Paged so the gallery can hold any number of photos: ?limit=24&offset=0&category=Wedding
 router.get('/gallery', wrap(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 24, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
   const params = [];
   let where = "type='image'";
   if (req.query.category) { where += ' AND category=?'; params.push(req.query.category); }
-  res.json(await db.q(`SELECT * FROM media WHERE ${where} ORDER BY id DESC LIMIT 200`, params));
+  res.json(await db.q(`SELECT * FROM media WHERE ${where} ORDER BY id DESC LIMIT ? OFFSET ?`, [...params, limit, offset]));
 }));
 
 router.get('/videos', wrap(async (req, res) => {

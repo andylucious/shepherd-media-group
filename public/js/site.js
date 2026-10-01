@@ -69,15 +69,34 @@ let galCat = 'All';
 function renderGalTabs() {
   $('#galTabs').innerHTML = GAL_CATS.map((c) => `<button class="tab ${c === galCat ? 'on' : ''}" data-g="${c}">${c}</button>`).join('');
 }
+const GAL_PAGE = 24;
+let galLoaded = 0;
+function galMore(n) {
+  galLoaded = n;
+  $('#galMore').style.display = n && n % GAL_PAGE === 0 ? '' : 'none';
+}
+async function galUrl() {
+  return '/gallery?limit=' + GAL_PAGE + '&offset=' + galLoaded + (galCat === 'All' ? '' : '&category=' + encodeURIComponent(galCat));
+}
 async function filterGallery(c) {
-  galCat = c; renderGalTabs();
-  const gal = await api('/gallery' + (c === 'All' ? '' : '?category=' + encodeURIComponent(c)));
+  galCat = c; galLoaded = 0; renderGalTabs();
+  const gal = await api(await galUrl());
   $('#gal').innerHTML = gal.length ? gal.map(gItem).join('') : `<div class="empty">No ${c.toLowerCase()} photos yet.</div>`;
+  galMore(gal.length);
+}
+async function loadMorePhotos() {
+  const btn = $('#galMore');
+  btn.disabled = true;
+  const more = await api(await galUrl());
+  $('#gal').insertAdjacentHTML('beforeend', more.map(gItem).join(''));
+  galMore(galLoaded + more.length);
+  if (more.length < GAL_PAGE) btn.style.display = 'none';
+  btn.disabled = false;
 }
 function lightbox(src) { $('#lightbox img').src = src; $('#lightbox').classList.add('open'); }
 const gItem = (m) => `<div class="g" data-src="${esc(m.file)}"><img loading="lazy" src="${esc(m.file)}" alt="${esc(m.title)}"><button class="like" data-like="${m.id}">♥ ${m.likes}</button></div>`;
 async function loadGallery() {
-  const [picks, gal, vids] = await Promise.all([api('/picks'), api('/gallery'), api('/videos')]);
+  const [picks, gal, vids] = await Promise.all([api('/picks'), api('/gallery?limit=' + GAL_PAGE), api('/videos')]);
   $('#picks').innerHTML = picks.day ? `
     <div class="pick" data-src="${esc(picks.day.file)}"><span class="lbl">Photo of the day</span><img src="${esc(picks.day.file)}" alt=""></div>
     <div class="pick m" data-src="${esc(picks.month.file)}"><span class="lbl">Photo of the month</span><img src="${esc(picks.month.file)}" alt=""></div>` : '';
@@ -85,6 +104,7 @@ async function loadGallery() {
   $('#bestWrap').style.display = picks.best.length ? '' : 'none';
   renderGalTabs();
   $('#gal').innerHTML = gal.length ? gal.map(gItem).join('') : '<div class="empty">Gallery coming soon.</div>';
+  galMore(gal.length);
   $('#vids').innerHTML = vids.length ? vids.map((v) => `<div><video controls preload="metadata" src="${esc(v.file)}#t=0.5"></video><h4>${esc(v.title)}</h4></div>`).join('') : '';
   $('#videoWrap').style.display = vids.length ? '' : 'none';
 }
@@ -102,7 +122,8 @@ async function loadPosts(limit) {
 
 document.addEventListener('click', (e) => {
   const t = e.target;
-  if (t.matches('[data-g]')) filterGallery(t.dataset.g);
+  if (t.matches('#galMore')) loadMorePhotos();
+  else if (t.matches('[data-g]')) filterGallery(t.dataset.g);
   else if (t.matches('.tab')) { cat = t.dataset.c; renderPackages(); }
   else if (t.matches('[data-q]')) openQuote(t.dataset.q);
   else if (t.matches('[data-close]') || t.classList.contains('overlay')) t.closest('.overlay').classList.remove('open');

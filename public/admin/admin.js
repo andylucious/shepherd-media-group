@@ -153,37 +153,97 @@ async function packages() {
 }
 
 // ---- gallery + videos ----
+const MEDIA_PAGE = 60;
+const thumbHtml = (m) => `<div class="thumb" data-id="${m.id}">
+    ${m.type === 'video' ? `<video src="${esc(m.file)}#t=0.5" preload="metadata"></video>` : `<img loading="lazy" src="${esc(m.file)}" alt="">`}
+    <div><b>${esc(m.title)}</b><br><small>${esc(m.category)} · ♥ ${m.likes} · 👁 ${m.views}</small><div class="acts" style="margin-top:6px">
+      <button class="btn btn-ghost" data-ren="${m.id}">Rename</button><button class="btn btn-del" data-del="${m.id}">Delete</button></div></div></div>`;
+
+// Uploads go up in small batches, so there is no limit on how many photos can be added at once.
+function uploadBatch(fd, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/admin/media');
+    xhr.upload.onprogress = (p) => onProgress(p.loaded);
+    xhr.onload = () => { let r = {}; try { r = JSON.parse(xhr.responseText); } catch (e) {} xhr.status === 200 ? resolve(r) : reject(new Error(r.error || 'Upload failed')); };
+    xhr.onerror = () => reject(new Error('Connection lost'));
+    xhr.send(fd);
+  });
+}
+
 async function media() {
-  const rows = await A('GET', '/media');
+  let items = [];
+  let total = 0;
+  const load = async () => { const r = await A('GET', `/media?limit=${MEDIA_PAGE}&offset=${items.length}`); total = r.total; items = items.concat(r.items); };
+  await load();
+  const draw = () => {
+    $('#lib').innerHTML = items.map(thumbHtml).join('') || '<p>Nothing uploaded yet.</p>';
+    $('#libTitle').textContent = `Library (${total})`;
+    $('#more').style.display = items.length < total ? '' : 'none';
+  };
   $('#main').innerHTML = `<h2>Gallery &amp; videos</h2>
   <div class="panel"><h3>Upload</h3><form id="uf">
     <div class="row2"><div><label>Category</label><select name="category">${MEDIA_CATS.map((c) => `<option>${c}</option>`).join('')}</select></div>${fld('Title (optional)', 'title')}</div>
-    <label>Photos or videos (you can select many)</label><input type="file" name="files" accept="image/*,video/*" multiple required>
-    <p class="lead" style="margin:6px 0 0;font-size:.85rem">The website automatically picks the Photo of the day, Photo of the month and Best memories (most liked and viewed) from your photos.</p>
-    <p><button class="btn btn-red" id="ub">Upload</button> <span id="up"></span></p></form></div>
-  <div class="panel"><h3>Library (${rows.length})</h3><div class="thumbs">${rows.map((m) => `<div class="thumb">
-    ${m.type === 'video' ? `<video src="${esc(m.file)}#t=0.5" preload="metadata"></video>` : `<img loading="lazy" src="${esc(m.file)}" alt="">`}
-    <div><b>${esc(m.title)}</b><br><small>${esc(m.category)} · ♥ ${m.likes} · 👁 ${m.views}</small><div class="acts" style="margin-top:6px">
-      <button class="btn btn-ghost" data-ren="${m.id}">Rename</button><button class="btn btn-del" data-del="${m.id}">Delete</button></div></div></div>`).join('') || '<p>Nothing uploaded yet.</p>'}</div></div>`;
-  $('#uf').onsubmit = (e) => {
+    <label>Photos or videos (add as many as you like)</label>
+    <div id="drop" style="border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;background:var(--blue-soft)">
+      <p style="margin:0 0 8px"><b>Drag and drop</b> photos and videos here, or</p>
+      <input type="file" id="files" accept="image/*,video/*" multiple style="max-width:340px">
+      <p id="picked" class="lead" style="margin:8px 0 0;font-size:.9rem">No files chosen</p></div>
+    <p class="lead" style="margin:6px 0 0;font-size:.85rem">Large selections are sent a few at a time. Keep this page open until it says Done. The website picks Photo of the day, Photo of the month and Best memories from your photos automatically.</p>
+    <p><button class="btn btn-red" id="ub">Upload</button> <span id="up"></span></p>
+    <div id="bar" class="hidden" style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><div id="barin" style="height:100%;width:0;background:var(--red);transition:.2s"></div></div></form></div>
+  <div class="panel"><h3 id="libTitle"></h3><div class="thumbs" id="lib"></div>
+    <p style="text-align:center"><button class="btn btn-ghost" id="more">Show more</button></p></div>`;
+  draw();
+  const input = $('#files');
+  const showPicked = () => { const n = input.files.length; $('#picked').textContent = n ? `${n} file(s) chosen (${(Array.from(input.files).reduce((s, f) => s + f.size, 0) / 1048576).toFixed(1)} MB)` : 'No files chosen'; };
+  input.onchange = showPicked;
+  const drop = $('#drop');
+  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.style.borderColor = 'var(--red)'; }));
+  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.style.borderColor = ''; }));
+  drop.addEventListener('drop', (e) => { const dt = new DataTransfer(); Array.from(e.dataTransfer.files).filter((f) => /^(image|video)\//.test(f.type)).forEach((f) => dt.items.add(f)); input.files = dt.files; showPicked(); });
+
+  $('#uf').onsubmit = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/admin/media');
-    xhr.upload.onprogress = (p) => { $('#up').textContent = Math.round((p.loaded / p.total) * 100) + '%'; };
-    xhr.onload = () => { const r = JSON.parse(xhr.responseText || '{}'); if (xhr.status === 200) { toast(`${r.uploaded} uploaded`); media(); } else toast(r.error || 'Upload failed'); };
-    xhr.onerror = () => toast('Upload failed');
-    $('#ub').disabled = true; xhr.send(fd);
+    const files = Array.from(input.files);
+    if (!files.length) return toast('Choose some photos or videos first');
+    const category = e.target.category.value;
+    const title = e.target.title.value;
+    const BATCH = 8;
+    const grand = files.reduce((s, f) => s + f.size, 0) || 1;
+    let doneBytes = 0, uploaded = 0;
+    $('#ub').disabled = true; $('#bar').classList.remove('hidden');
+    try {
+      for (let i = 0; i < files.length; i += BATCH) {
+        const part = files.slice(i, i + BATCH);
+        const partBytes = part.reduce((s, f) => s + f.size, 0);
+        const fd = new FormData();
+        fd.append('category', category); fd.append('title', title);
+        part.forEach((f) => fd.append('files', f));
+        await uploadBatch(fd, (loaded) => {
+          $('#barin').style.width = Math.min(100, ((doneBytes + Math.min(loaded, partBytes)) / grand) * 100) + '%';
+          $('#up').textContent = `${uploaded + part.length > files.length ? files.length : Math.min(i + BATCH, files.length)} of ${files.length}`;
+        });
+        doneBytes += partBytes; uploaded += part.length;
+      }
+      toast(`${uploaded} uploaded`);
+      media();
+    } catch (er) {
+      toast(`${er.message}. ${uploaded} of ${files.length} were uploaded.`);
+      $('#ub').disabled = false;
+      if (uploaded) media();
+    }
   };
+  $('#more').onclick = async () => { await load(); draw(); };
   $('#main').onclick = async (e) => {
     const t = e.target;
-    if (t.dataset.del && confirm('Delete this file?')) { await A('DELETE', `/media/${t.dataset.del}`); media(); }
+    if (t.dataset.del && confirm('Delete this file?')) { await A('DELETE', `/media/${t.dataset.del}`); items = items.filter((m) => m.id != t.dataset.del); total--; draw(); }
     if (t.dataset.ren) {
-      const m = rows.find((r) => r.id == t.dataset.ren);
+      const m = items.find((r) => r.id == t.dataset.ren);
       const title = prompt('Title', m.title);
       if (title === null) return;
       const category = prompt('Category (' + MEDIA_CATS.join(', ') + ')', m.category) || m.category;
-      await A('PUT', `/media/${m.id}`, { title, category }); media();
+      await A('PUT', `/media/${m.id}`, { title, category }); Object.assign(m, { title, category }); draw();
     }
   };
 }
