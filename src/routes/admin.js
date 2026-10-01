@@ -12,23 +12,42 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const SECRET = () => process.env.JWT_SECRET || 'dev-secret-change-me';
 const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
 
+// Recalculate an invoice's paid amount and status from its payment records
+async function syncInvoice(id) {
+  const inv = await db.one('SELECT amount, discount FROM invoices WHERE id=?', [id]);
+  if (!inv) return null;
+  const { s: paid } = await db.one('SELECT COALESCE(SUM(amount),0) s FROM payments WHERE invoice_id=?', [id]);
+  const total = inv.amount - inv.discount;
+  const status = paid <= 0 ? 'unpaid' : paid >= total ? 'paid' : 'partial';
+  await db.q('UPDATE invoices SET paid=?, status=? WHERE id=?', [paid, status, id]);
+  return status;
+}
+
 // ---- auth -------------------------------------------------------------
 router.post('/login', wrap(async (req, res) => {
   const { email = '', password = '' } = req.body || {};
   const u = await db.one('SELECT * FROM users WHERE email=?', [String(email).toLowerCase().trim()]);
-  if (!u || !(await bcrypt.compare(String(password), u.password_hash)))
+  if (!u || !u.active || !(await bcrypt.compare(String(password), u.password_hash)))
     return res.status(401).json({ error: 'Wrong email or password' });
-  const token = jwt.sign({ id: u.id, name: u.name, email: u.email }, SECRET(), { expiresIn: '7d' });
+  await db.q('UPDATE users SET last_login=NOW() WHERE id=?', [u.id]);
+  const token = jwt.sign({ id: u.id }, SECRET(), { expiresIn: '7d' });
   res.cookie('smg_admin', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 864e5, secure: req.secure });
-  res.json({ name: u.name, email: u.email });
+  res.json({ name: u.name, email: u.email, role: u.role });
 }));
 
 router.post('/logout', (req, res) => { res.clearCookie('smg_admin'); res.json({ ok: true }); });
 
-const auth = (req, res, next) => {
-  try { req.user = jwt.verify(req.cookies.smg_admin || '', SECRET()); next(); }
-  catch (e) { res.status(401).json({ error: 'Please sign in' }); }
-};
+// signed-in user is re-read on every request so disabling an account takes effect at once
+const auth = wrap(async (req, res, next) => {
+  let id;
+  try { id = jwt.verify(req.cookies.smg_admin || '', SECRET()).id; }
+  catch (e) { return res.status(401).json({ error: 'Please sign in' }); }
+  const u = await db.one('SELECT id, name, email, role, active FROM users WHERE id=?', [id]);
+  if (!u || !u.active) return res.status(401).json({ error: 'Please sign in' });
+  req.user = u;
+  next();
+});
+const adminOnly = (req, res, next) => (req.user.role === 'admin' ? next() : res.status(403).json({ error: 'Only an admin can do this' }));
 
 router.get('/me', auth, (req, res) => res.json(req.user));
 router.use(auth);
@@ -71,7 +90,7 @@ router.get('/visits', wrap(async (req, res) => {
 
 // ---- settings ---------------------------------------------------------
 router.get('/settings', wrap(async (req, res) => res.json(await db.getSettings())));
-router.put('/settings', wrap(async (req, res) => {
+router.put('/settings', adminOnly, wrap(async (req, res) => {
   for (const [k, v] of Object.entries(req.body || {}))
     await db.q('INSERT INTO settings (k,v) VALUES (?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)', [k.slice(0, 60), String(v)]);
   res.json(await db.getSettings());
@@ -212,15 +231,13 @@ router.post('/quotes/:id/invoice', wrap(async (req, res) => {
 router.get('/invoices', wrap(async (req, res) => res.json(await db.q('SELECT * FROM invoices ORDER BY id DESC LIMIT 300'))));
 router.put('/invoices/:id', wrap(async (req, res) => {
   const b = req.body;
-  const total = (Number(b.amount) || 0) - (Number(b.discount) || 0);
-  const paid = Number(b.paid) || 0;
-  const status = paid <= 0 ? 'unpaid' : paid >= total ? 'paid' : 'partial';
-  await db.q('UPDATE invoices SET client_name=?, phone=?, email=?, event_date=?, venue=?, package_name=?, items=?, amount=?, discount=?, paid=?, status=?, due_date=?, notes=? WHERE id=?',
+  await db.q('UPDATE invoices SET client_name=?, phone=?, email=?, event_date=?, venue=?, package_name=?, items=?, amount=?, discount=?, due_date=?, notes=? WHERE id=?',
     [b.client_name, b.phone || '', b.email || '', b.event_date || '', b.venue || '', b.package_name, b.items || '', Number(b.amount) || 0,
-      Number(b.discount) || 0, paid, status, b.due_date || '', b.notes || '', req.params.id]);
-  res.json({ ok: true, status });
+      Number(b.discount) || 0, b.due_date || '', b.notes || '', req.params.id]);
+  res.json({ ok: true, status: await syncInvoice(req.params.id) });
 }));
-router.delete('/invoices/:id', wrap(async (req, res) => {
+router.delete('/invoices/:id', adminOnly, wrap(async (req, res) => {
+  await db.q('DELETE FROM payments WHERE invoice_id=?', [req.params.id]);
   await db.q("UPDATE quotes SET invoice_id=NULL, status='new' WHERE invoice_id=?", [req.params.id]);
   await db.q('DELETE FROM invoices WHERE id=?', [req.params.id]);
   res.json({ ok: true });
@@ -228,8 +245,11 @@ router.delete('/invoices/:id', wrap(async (req, res) => {
 router.get('/invoices/:id/pdf', wrap(async (req, res) => {
   const i = await db.one('SELECT * FROM invoices WHERE id=?', [req.params.id]);
   if (!i) return res.status(404).send('Not found');
+  i.payments = await db.q('SELECT amount, method, reference, paid_at FROM payments WHERE invoice_id=? ORDER BY paid_at, id', [i.id]);
   pdf.invoice(res, i, await db.getSettings());
 }));
+
+require('./business')(router, { wrap, adminOnly, syncInvoice, upload });
 
 // multer errors -> JSON
 router.use((err, req, res, next) => {

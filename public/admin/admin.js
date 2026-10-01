@@ -31,7 +31,8 @@ $('#lf').addEventListener('submit', async (e) => {
 $('#logout').onclick = async () => { await A('POST', '/logout'); showLogin(); };
 $('#menu').onclick = () => $('#side').classList.toggle('open');
 
-const views = { dash, quotes, invoices, packages, media, blog, visitors, settings };
+const views = { dash, quotes, invoices, payables, projects, reports, users, packages, media, blog, visitors, settings };
+let ME = {};
 let current = 'dash';
 async function go(v) {
   current = v;
@@ -41,7 +42,12 @@ async function go(v) {
   try { await views[v](); } catch (e) { if (e.message !== 'auth') $('#main').innerHTML = '<p>Could not load this page.</p>'; }
 }
 document.querySelectorAll('.side .nav[data-v]').forEach((b) => (b.onclick = () => go(b.dataset.v)));
-async function start() { await A('GET', '/me'); $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); go(current); }
+async function start() {
+  ME = await A('GET', '/me');
+  document.querySelectorAll('[data-admin]').forEach((b) => b.classList.toggle('hidden', ME.role !== 'admin'));
+  if (ME.role !== 'admin' && ['reports', 'users'].includes(current)) current = 'dash';
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); go(current);
+}
 start().catch(() => showLogin());
 
 const stat = (v, l, cls = '') => `<div class="card ${cls}"><b>${v}</b><span>${l}</span></div>`;
@@ -103,38 +109,6 @@ async function quotes() {
         ${area('Notes', 'notes', q.notes, 2)}${sel('Status', 'status', ['new', 'sent', 'accepted', 'declined', 'invoiced'], q.status)}
         <div style="margin-top:14px;display:flex;gap:10px"><button class="btn btn-red">Save</button><button type="button" class="btn btn-ghost" data-close>Cancel</button></div></form>`);
       $('#ef').onsubmit = async (ev) => { ev.preventDefault(); await A('PUT', `/quotes/${q.id}`, formData(ev.target)); closeModal(); toast('Saved'); quotes(); };
-    }
-  };
-}
-
-// ---- invoices ----
-async function invoices() {
-  const rows = await A('GET', '/invoices');
-  $('#main').innerHTML = `<h2>Invoices</h2><div class="panel"><table>
-  <tr><th>No.</th><th>Client</th><th>Package</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr>
-  ${rows.map((i) => `<tr>
-    <td>${esc(i.number)}<br><small>${i.created_at.slice(0, 10)}</small></td><td>${esc(i.client_name)}<br><small>${esc(i.phone)}</small></td>
-    <td>${esc(i.package_name)}</td><td>${kes(i.amount - i.discount)}</td><td>${kes(i.paid)}</td><td>${esc(i.due_date)}</td>
-    <td><span class="pill ${i.status === 'paid' ? 'green' : i.status === 'partial' ? '' : 'red'}">${esc(i.status)}</span></td>
-    <td><div class="acts"><a class="btn btn-ghost" href="/api/admin/invoices/${i.id}/pdf">PDF</a>
-      <button class="btn btn-ghost" data-edit="${i.id}">Edit / payment</button>
-      <a class="btn btn-ghost" target="_blank" href="${waUrl(i.phone, `Hello ${i.client_name}, invoice ${i.number} for ${kes(i.amount - i.discount - i.paid)} is outstanding. Shepherd Media Group.`)}">WhatsApp</a>
-      <button class="btn btn-del" data-del="${i.id}">Delete</button></div></td></tr>`).join('') || '<tr><td colspan="8">No invoices yet. Open a quote and press "Make invoice".</td></tr>'}
-  </table></div>`;
-  $('#main').onclick = async (e) => {
-    const t = e.target;
-    if (t.dataset.del && confirm('Delete this invoice? The quote becomes editable again.')) { await A('DELETE', `/invoices/${t.dataset.del}`); invoices(); }
-    if (t.dataset.edit) {
-      const i = rows.find((r) => r.id == t.dataset.edit);
-      modal(`<h3>Edit ${esc(i.number)}</h3><form id="ef">
-        ${fld('Client', 'client_name', i.client_name)}<div class="row2">${fld('Phone', 'phone', i.phone)}${fld('Email', 'email', i.email)}</div>
-        <div class="row2">${fld('Event date', 'event_date', i.event_date, 'date')}${fld('Venue', 'venue', i.venue)}</div>
-        ${fld('Package name', 'package_name', i.package_name)}${area('What is included (one per line)', 'items', i.items, 6)}
-        <div class="row2">${fld('Amount (KES)', 'amount', i.amount, 'number', 'step="any"')}${fld('Discount (KES)', 'discount', i.discount, 'number', 'step="any"')}</div>
-        <div class="row2">${fld('Amount paid so far (KES)', 'paid', i.paid, 'number', 'step="any"')}${fld('Due date', 'due_date', i.due_date, 'date')}</div>
-        ${area('Notes', 'notes', i.notes, 2)}
-        <div style="margin-top:14px;display:flex;gap:10px"><button class="btn btn-red">Save</button><button type="button" class="btn btn-ghost" data-close>Cancel</button></div></form>`);
-      $('#ef').onsubmit = async (ev) => { ev.preventDefault(); await A('PUT', `/invoices/${i.id}`, formData(ev.target)); closeModal(); toast('Saved'); invoices(); };
     }
   };
 }

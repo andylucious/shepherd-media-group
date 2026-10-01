@@ -15,6 +15,10 @@ Create a MySQL instance and set in `.env` (or the service's environment):
 Also set a long random `JWT_SECRET`.
 Photos and videos are stored in `uploads/`; on Cloud Run use a Cloud Storage bucket (or a mounted volume), as container disk is not persistent.
 
+## Back office
+Quotes, invoices with part payments, payables (bills you owe), client project links (shown to clients under "My project"),
+reports (CSV export), users (admin / staff), gallery, packages, blog, visitors, settings. Light and dark theme on the site and back office.
+
 ## API
 - Public: `/api/public/{settings,packages,gallery,videos,picks,posts,quotes}`
 - Admin (cookie login): `/api/admin/*`

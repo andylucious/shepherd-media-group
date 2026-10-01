@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My project | Shepherd Media Group</title>
+<link rel="icon" href="/img/logo.png">
+<script src="/js/theme.js"></script>
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/"><img src="/img/logo.png" alt="SMG logo"><span>Shepherd <b>Media</b> Group</span></a>
+  <button class="theme-btn" data-theme-toggle type="button"></button>
+  <button class="burger" aria-label="Menu">☰</button>
+  <nav class="main"><a href="/#packages">Packages</a><a href="/#gallery">Gallery</a><a href="/#about">About</a><a href="/blog.html">Blog</a><a href="/project.html">My project</a><a class="btn btn-red btn-sm" href="/#packages">Get a quote</a></nav>
+</div></header>
+<section><div class="wrap" style="max-width:640px">
+  <div class="eyebrow">Client area</div>
+  <h2>Find your photos &amp; videos</h2>
+  <p class="lead">Enter the reference number from your quotation or invoice (for example SMG-Q-0001) and the phone number you gave us.</p>
+  <form id="pf" class="panel-box" style="margin-top:20px">
+    <label>Reference number</label><input name="reference" placeholder="SMG-Q-0001" required>
+    <label>Phone number</label><input name="phone" type="tel" placeholder="07XX XXX XXX" required>
+    <div class="err" id="pe"></div>
+    <button class="btn btn-red" type="submit">Show my project</button>
+  </form>
+  <div id="res" style="margin-top:26px"></div>
+</div></section>
+<footer><div class="wrap"><div class="copy" style="border:0;margin:0">© Shepherd Media Group · <span data-s="phone"></span></div></div></footer>
+<a class="wa" data-wa href="#" target="_blank" rel="noopener">💬 WhatsApp</a>
+<script src="/js/site.js"></script>
+<script>
+function show(list) {
+  $('#res').innerHTML = list.length ? list.map((p) => `
+    <div class="pkg" style="margin-bottom:16px">
+      <h3>${esc(p.title)}</h3>
+      <div class="tag">${esc(p.client_name)} · ${esc(String(p.created_at).slice(0, 10))}</div>
+      ${p.note ? `<p>${esc(p.note)}</p>` : ''}
+      <a class="btn btn-blue" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Open my project ↗</a>
+    </div>`).join('') : '<div class="empty">No project has been shared with you yet. We will message you when it is ready.</div>';
+}
+$('#pf').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#pe').textContent = '';
+  const r = await api('/projects/lookup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(e.target))) });
+  if (r.error) { $('#pe').textContent = r.error; $('#res').innerHTML = ''; return; }
+  show(r);
+});
+const tk = new URLSearchParams(location.search).get('t');
+if (tk) api('/projects/' + encodeURIComponent(tk)).then((r) => { if (!r.error) { $('#pf').style.display = 'none'; show(r); } });
+</script>
+</body>
+</html>

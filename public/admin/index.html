@@ -6,40 +6,48 @@
 <title>SMG Back Office</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/img/logo.png">
+<script src="/js/theme.js"></script>
 <link rel="stylesheet" href="/css/site.css">
 <style>
-body { background: #f5f7fb; }
+body { background: var(--page); }
 .login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .login .modal { box-shadow: var(--shadow); text-align: center; max-width: 400px; }
 .login img { width: 150px; margin: 0 auto 10px; }
 .app { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
-.side { background: #fff; border-right: 1px solid var(--line); padding: 18px 12px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; }
+.side { background: var(--surface); border-right: 1px solid var(--line); padding: 18px 12px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; }
 .side .brand { padding: 0 8px 14px; }
 .side button.nav { text-align: left; background: none; border: 0; padding: 11px 14px; border-radius: 10px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
 .side button.nav.on { background: var(--blue-soft); color: var(--blue); }
 .side button.nav:hover { color: var(--blue); }
 main { padding: 26px; min-width: 0; }
 main h2 { margin-bottom: 18px; }
+.bars2 { display: flex; align-items: flex-end; gap: 14px; height: 150px; padding-bottom: 22px; }
+.bars2 .m { flex: 1; display: flex; align-items: flex-end; gap: 3px; height: 100%; position: relative; }
+.bars2 .m b { flex: 1; border-radius: 3px 3px 0 0; min-height: 2px; }
+.bars2 .m i { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .7rem; color: var(--muted); font-style: normal; }
+.legend span { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 12px; }
+tr.od td { background: var(--red-soft); }
+@media print { .side, #topbar, .toast, form, .acts, .theme-btn { display: none !important; } .app { display: block; } body { background: #fff; } }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 22px; }
-.card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
 .card b { display: block; font-size: 1.7rem; color: var(--blue); }
 .card span { color: var(--muted); font-size: .85rem; }
 .card.r b { color: var(--red); }
-.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; overflow-x: auto; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th { text-align: left; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; padding: 8px; border-bottom: 2px solid var(--line); }
 td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; background: var(--blue-soft); color: var(--blue); }
-.pill.red { background: #fde8e1; color: var(--red-dark); }
-.pill.green { background: #e2f6e9; color: #167a3c; }
+.pill.red { background: var(--red-soft); color: var(--red-dark); }
+.pill.green { background: var(--green-soft); color: var(--green); }
 .acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .acts .btn, .btn-sm { padding: 6px 12px; font-size: .82rem; }
-.btn-del { background: #fff; color: var(--red); border: 1.5px solid #f3b9a8; }
+.btn-del { background: var(--surface); color: var(--red); border: 1.5px solid var(--del-line); }
 .bars { display: flex; align-items: flex-end; gap: 6px; height: 130px; }
 .bars div { flex: 1; background: var(--blue); border-radius: 4px 4px 0 0; position: relative; min-height: 2px; }
 .bars div i { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .65rem; color: var(--muted); font-style: normal; }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-.thumb { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.thumb { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
 .thumb img, .thumb video { width: 100%; height: 110px; object-fit: cover; background: #000; }
 .thumb div { padding: 8px; font-size: .8rem; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -51,7 +59,7 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
   .app { grid-template-columns: 1fr; }
   .side { position: fixed; z-index: 50; left: -250px; width: 230px; transition: .2s; }
   .side.open { left: 0; }
-  #topbar { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  #topbar { display: flex; justify-content: space-between; align-items: center; background: var(--surface); padding: 10px 16px; border-bottom: 1px solid var(--line); }
   .two { grid-template-columns: 1fr; }
   main { padding: 16px; }
 }
@@ -62,6 +70,7 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
 <div class="login" id="login"><div class="modal">
   <img src="/img/logo.png" alt="">
   <h3>SMG Back Office</h3>
+  <p style="margin:-6px 0 8px"><button type="button" class="theme-btn" data-theme-toggle></button></p>
   <form id="lf" style="text-align:left">
     <label>Email</label><input name="email" type="email" required autocomplete="username">
     <label>Password</label><input name="password" type="password" required autocomplete="current-password">
@@ -75,14 +84,19 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
     <div class="brand"><img src="/img/logo.png" alt=""><span>SMG <b>Admin</b></span></div>
     <button class="nav" data-v="dash">Dashboard</button>
     <button class="nav" data-v="quotes">Quotes</button>
-    <button class="nav" data-v="invoices">Invoices</button>
+    <button class="nav" data-v="invoices">Invoices &amp; payments</button>
+    <button class="nav" data-v="payables">Payables</button>
+    <button class="nav" data-v="projects">Client projects</button>
+    <button class="nav" data-v="reports" data-admin>Reports</button>
     <button class="nav" data-v="packages">Packages</button>
     <button class="nav" data-v="media">Gallery &amp; videos</button>
     <button class="nav" data-v="blog">Blog</button>
     <button class="nav" data-v="visitors">Visitors</button>
+    <button class="nav" data-v="users" data-admin>Users</button>
     <button class="nav" data-v="settings">Settings</button>
     <span style="flex:1"></span>
     <a class="nav btn-sm" href="/" target="_blank" style="padding:11px 14px;color:var(--muted);font-weight:600">View website ↗</a>
+    <button class="nav" data-theme-toggle type="button"></button>
     <button class="nav" id="logout">Sign out</button>
   </aside>
   <div>
@@ -93,6 +107,7 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
 
 <div class="overlay" id="ov"><div class="modal wide" id="ovc"></div></div>
 <div class="toast hidden" id="toast"></div>
+<script src="/admin/admin-business.js"></script>
 <script src="/admin/admin.js"></script>
 </body>
 </html>

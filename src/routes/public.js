@@ -114,4 +114,26 @@ router.get('/quotes/:token/pdf', wrap(async (req, res) => {
   pdf.quote(res, q, await db.getSettings());
 }));
 
+// ---- client project links ----------------------------------------------
+const last9 = (p) => String(p || '').replace(/\D/g, '').slice(-9);
+const projectOut = (p) => ({ title: p.title, url: p.url, note: p.note, client_name: p.client_name, created_at: p.created_at });
+
+// direct link shared by the admin
+router.get('/projects/:token', wrap(async (req, res) => {
+  const p = await db.one('SELECT * FROM projects WHERE token=?', [req.params.token]);
+  if (!p) return res.status(404).json({ error: 'Project not found' });
+  res.json([projectOut(p)]);
+}));
+
+// client finds their projects with a quotation/invoice number plus the phone number they used
+router.post('/projects/lookup', wrap(async (req, res) => {
+  const ref = String(req.body.reference || '').trim().toUpperCase();
+  const phone = last9(req.body.phone);
+  if (!ref || phone.length < 9) return res.status(400).json({ error: 'Enter your reference number and phone number.' });
+  const doc = (await db.one('SELECT phone FROM quotes WHERE number=?', [ref])) || (await db.one('SELECT phone FROM invoices WHERE number=?', [ref]));
+  if (!doc || last9(doc.phone) !== phone) return res.status(404).json({ error: 'We could not match that reference and phone number.' });
+  const rows = (await db.q('SELECT * FROM projects ORDER BY id DESC')).filter((p) => last9(p.phone) === phone || p.quote_number.toUpperCase() === ref);
+  res.json(rows.map(projectOut));
+}));
+
 module.exports = router;

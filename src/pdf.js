@@ -100,6 +100,17 @@ function build(res, filename, kind, doc, s) {
     pdf.font('Helvetica').fontSize(10).fillColor(MUTED).text('Amount paid', tx, y).fillColor(INK).text(money(paid), tx, y, { width: tw, align: 'right' });
     y += 18;
     pdf.font('Helvetica-Bold').fillColor(BLUE).text('Balance due', tx, y).text(money(Math.max(total - paid, 0)), tx, y, { width: tw, align: 'right' });
+    if (doc.payments && doc.payments.length) {
+      y += 28;
+      pdf.font('Helvetica-Bold').fontSize(8).fillColor(RED).text('PAYMENTS RECEIVED', tx, y);
+      y += 13;
+      pdf.font('Helvetica').fontSize(8).fillColor(MUTED);
+      for (const p of doc.payments.slice(-6)) {
+        pdf.text(`${String(p.paid_at).slice(0, 10)}  ${p.method}${p.reference ? ' ' + p.reference : ''}`, tx, y, { width: tw - 80 });
+        pdf.text(money(p.amount), tx, y, { width: tw, align: 'right' });
+        y += 12;
+      }
+    }
   } else {
     pdf.font('Helvetica').fontSize(9).fillColor(MUTED).text('A 50% deposit secures your date.', tx - 10, y, { width: tw + 10, align: 'right' });
   }

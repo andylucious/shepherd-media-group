@@ -104,6 +104,49 @@ const SCHEMA = [
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    method VARCHAR(30) DEFAULT 'M-Pesa',
+    reference VARCHAR(80) DEFAULT '',
+    note VARCHAR(255) DEFAULT '',
+    paid_at DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX (invoice_id), INDEX (paid_at)
+  ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS payables (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier VARCHAR(160) NOT NULL,
+    description VARCHAR(255) DEFAULT '',
+    category VARCHAR(40) DEFAULT 'Other',
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    paid DECIMAL(12,2) NOT NULL DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'unpaid',
+    due_date VARCHAR(20) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS payable_payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    payable_id INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    method VARCHAR(30) DEFAULT 'M-Pesa',
+    reference VARCHAR(80) DEFAULT '',
+    paid_at DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX (payable_id), INDEX (paid_at)
+  ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS projects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    token VARCHAR(40) NOT NULL UNIQUE,
+    client_name VARCHAR(160) NOT NULL,
+    phone VARCHAR(40) DEFAULT '',
+    quote_number VARCHAR(30) DEFAULT '',
+    title VARCHAR(190) NOT NULL,
+    url VARCHAR(600) NOT NULL,
+    note VARCHAR(500) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) DEFAULT CHARSET=utf8mb4`,
   `CREATE TABLE IF NOT EXISTS visits (
     id INT AUTO_INCREMENT PRIMARY KEY,
     visitor VARCHAR(40) NOT NULL,
@@ -161,9 +204,21 @@ async function init() {
   for (const sql of SCHEMA) await pool.query(sql);
 
   // migrations for databases created before a column existed
-  const [[{ c: hasImg }]] = await pool.query(
-    "SELECT COUNT(*) c FROM information_schema.columns WHERE table_schema=? AND table_name='packages' AND column_name='image'", [dbName]);
-  if (!hasImg) await pool.query("ALTER TABLE packages ADD COLUMN image VARCHAR(255) DEFAULT ''");
+  const addColumn = async (table, col, def) => {
+    const [[{ c }]] = await pool.query(
+      'SELECT COUNT(*) c FROM information_schema.columns WHERE table_schema=? AND table_name=? AND column_name=?', [dbName, table, col]);
+    if (!c) await pool.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  };
+  await addColumn('packages', 'image', "VARCHAR(255) DEFAULT ''");
+  await addColumn('users', 'role', "VARCHAR(20) NOT NULL DEFAULT 'admin'");
+  await addColumn('users', 'phone', "VARCHAR(40) DEFAULT ''");
+  await addColumn('users', 'active', 'TINYINT(1) NOT NULL DEFAULT 1');
+  await addColumn('users', 'last_login', 'TIMESTAMP NULL DEFAULT NULL');
+  // invoices that were marked paid before payment records existed keep their amount as one payment
+  await pool.query(
+    `INSERT INTO payments (invoice_id, amount, method, note, paid_at)
+     SELECT i.id, i.paid, 'Earlier payment', 'Imported', DATE(i.created_at) FROM invoices i
+     WHERE i.paid > 0 AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.invoice_id = i.id)`);
 
   const [[{ n: userCount }]] = await pool.query('SELECT COUNT(*) n FROM users');
   if (!userCount) {
