@@ -63,6 +63,16 @@ async function submitQuote(e) {
 }
 
 // ---- gallery ----
+const GAL_CATS = ['All', 'Wedding', 'Ruracio', 'Birthday', 'Professional'];
+let galCat = 'All';
+function renderGalTabs() {
+  $('#galTabs').innerHTML = GAL_CATS.map((c) => `<button class="tab ${c === galCat ? 'on' : ''}" data-g="${c}">${c}</button>`).join('');
+}
+async function filterGallery(c) {
+  galCat = c; renderGalTabs();
+  const gal = await api('/gallery' + (c === 'All' ? '' : '?category=' + encodeURIComponent(c)));
+  $('#gal').innerHTML = gal.length ? gal.map(gItem).join('') : `<div class="empty">No ${c.toLowerCase()} photos yet.</div>`;
+}
 function lightbox(src) { $('#lightbox img').src = src; $('#lightbox').classList.add('open'); }
 const gItem = (m) => `<div class="g" data-src="${esc(m.file)}"><img loading="lazy" src="${esc(m.file)}" alt="${esc(m.title)}"><button class="like" data-like="${m.id}">♥ ${m.likes}</button></div>`;
 async function loadGallery() {
@@ -72,6 +82,7 @@ async function loadGallery() {
     <div class="pick m" data-src="${esc(picks.month.file)}"><span class="lbl">Photo of the month</span><img src="${esc(picks.month.file)}" alt=""></div>` : '';
   $('#best').innerHTML = picks.best.length ? picks.best.map(gItem).join('') : '<div class="empty">Best memories appear here as photos are added and liked.</div>';
   $('#bestWrap').style.display = picks.best.length ? '' : 'none';
+  renderGalTabs();
   $('#gal').innerHTML = gal.length ? gal.map(gItem).join('') : '<div class="empty">Gallery coming soon.</div>';
   $('#vids').innerHTML = vids.length ? vids.map((v) => `<div><video controls preload="metadata" src="${esc(v.file)}#t=0.5"></video><h4>${esc(v.title)}</h4></div>`).join('') : '';
   $('#videoWrap').style.display = vids.length ? '' : 'none';
@@ -90,7 +101,8 @@ async function loadPosts(limit) {
 
 document.addEventListener('click', (e) => {
   const t = e.target;
-  if (t.matches('.tab')) { cat = t.dataset.c; renderPackages(); }
+  if (t.matches('[data-g]')) filterGallery(t.dataset.g);
+  else if (t.matches('.tab')) { cat = t.dataset.c; renderPackages(); }
   else if (t.matches('[data-q]')) openQuote(t.dataset.q);
   else if (t.matches('[data-close]') || t.classList.contains('overlay')) t.closest('.overlay').classList.remove('open');
   else if (t.matches('[data-like]')) {

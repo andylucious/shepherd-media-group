@@ -1,7 +1,8 @@
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const kes = (n) => 'KES ' + Number(n || 0).toLocaleString('en-KE');
-const CATS = ['Wedding', 'Ruracio', 'Livestreaming', 'Burial', 'General'];
+const CATS = ['Wedding', 'Ruracio', 'Livestreaming', 'Burial'];
+const MEDIA_CATS = ['Wedding', 'Ruracio', 'Birthday', 'Professional'];
 
 async function A(method, url, body) {
   const opt = { method, headers: {} };
@@ -149,7 +150,7 @@ async function packages() {
   </table></div>`;
   const form = (p = {}) => {
     modal(`<h3>${p.id ? 'Edit' : 'New'} package</h3><form id="ef">
-      ${sel('Category', 'category', CATS.slice(0, 4), p.category)}${fld('Name', 'name', p.name, 'text', 'required')}${fld('Tagline', 'tagline', p.tagline)}
+      ${sel('Category', 'category', CATS, p.category)}${fld('Name', 'name', p.name, 'text', 'required')}${fld('Tagline', 'tagline', p.tagline)}
       ${fld('Price (KES)', 'price', p.price ?? 0, 'number', 'step="any" required')}${area('What is included (one item per line)', 'features', p.features, 8)}
       <div class="row2">${fld('Sort order', 'sort_order', p.sort_order ?? 0, 'number')}
       <div><label>Options</label><label style="font-weight:400"><input type="checkbox" name="popular" style="width:auto" ${p.popular ? 'checked' : ''}> Mark as most popular</label>
@@ -174,7 +175,7 @@ async function media() {
   const rows = await A('GET', '/media');
   $('#main').innerHTML = `<h2>Gallery &amp; videos</h2>
   <div class="panel"><h3>Upload</h3><form id="uf">
-    <div class="row2"><div><label>Category</label><select name="category">${CATS.map((c) => `<option>${c}</option>`).join('')}</select></div>${fld('Title (optional)', 'title')}</div>
+    <div class="row2"><div><label>Category</label><select name="category">${MEDIA_CATS.map((c) => `<option>${c}</option>`).join('')}</select></div>${fld('Title (optional)', 'title')}</div>
     <label>Photos or videos (you can select many)</label><input type="file" name="files" accept="image/*,video/*" multiple required>
     <p class="lead" style="margin:6px 0 0;font-size:.85rem">The website automatically picks the Photo of the day, Photo of the month and Best memories (most liked and viewed) from your photos.</p>
     <p><button class="btn btn-red" id="ub">Upload</button> <span id="up"></span></p></form></div>
@@ -199,7 +200,7 @@ async function media() {
       const m = rows.find((r) => r.id == t.dataset.ren);
       const title = prompt('Title', m.title);
       if (title === null) return;
-      const category = prompt('Category (' + CATS.join(', ') + ')', m.category) || m.category;
+      const category = prompt('Category (' + MEDIA_CATS.join(', ') + ')', m.category) || m.category;
       await A('PUT', `/media/${m.id}`, { title, category }); media();
     }
   };
