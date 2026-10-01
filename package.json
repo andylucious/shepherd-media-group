@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Shepherd Media Group website and back office",
   "main": "server.js",
+  "engines": { "node": ">=20" },
   "scripts": { "start": "node server.js" },
   "license": "ISC",
   "dependencies": {

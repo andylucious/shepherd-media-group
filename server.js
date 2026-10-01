@@ -8,7 +8,8 @@ app.set('trust proxy', true);
 app.use(express.json({ limit: '2mb' }));
 app.use(require('cookie-parser')());
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }));
+const UPLOADS = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(UPLOADS, { maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/public', require('./src/routes/public'));

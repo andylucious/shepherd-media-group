@@ -10,7 +10,8 @@ const pdf = require('../pdf');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const SECRET = () => process.env.JWT_SECRET || 'dev-secret-change-me';
-const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
+// On Railway point UPLOADS_DIR at the mounted volume (e.g. /data/uploads) so files survive redeploys
+const UPLOADS = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 
 // Recalculate an invoice's paid amount and status from its payment records
 async function syncInvoice(id) {

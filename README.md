@@ -22,3 +22,15 @@ reports (CSV export), users (admin / staff), gallery, packages, blog, visitors, 
 ## API
 - Public: `/api/public/{settings,packages,gallery,videos,picks,posts,quotes}`
 - Admin (cookie login): `/api/admin/*`
+
+## Deploy on Railway
+1. Push this repo to GitHub, then on https://railway.com create a **New Project → Deploy from GitHub repo** and pick it.
+2. In the same project click **+ New → Database → MySQL**. Railway provides `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`; the app reads them automatically.
+3. In the app service → **Variables**, add:
+   - `JWT_SECRET` = a long random string
+   - `ADMIN_EMAIL` and `ADMIN_PASSWORD` = the first admin (used only when no users exist yet)
+   - `SITE_URL` = your Railway or custom domain
+   - `UPLOADS_DIR` = `/data/uploads`
+   - `DB_HOST`=`${{MySQL.MYSQLHOST}}`, `DB_PORT`=`${{MySQL.MYSQLPORT}}`, `DB_USER`=`${{MySQL.MYSQLUSER}}`, `DB_PASSWORD`=`${{MySQL.MYSQLPASSWORD}}`, `DB_NAME`=`${{MySQL.MYSQLDATABASE}}` (reference variables, so the app and database stay linked)
+4. In the app service → **Settings → Volumes** add a volume mounted at `/data`, so uploaded photos and videos survive redeploys.
+5. **Settings → Networking → Generate Domain** (or add your own domain). Railway runs `npm start`.

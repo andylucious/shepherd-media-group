@@ -1,19 +1,21 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
-const dbName = process.env.DB_NAME || 'shepherd_media';
+// Works with our own DB_* settings, or the MYSQL* variables Railway provides.
+const env = (a, b, d) => process.env[a] || process.env[b] || d;
+const dbName = env('DB_NAME', 'MYSQLDATABASE', 'shepherd_media');
 
 const baseConfig = () => {
   const cfg = {
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+    user: env('DB_USER', 'MYSQLUSER', 'root'),
+    password: env('DB_PASSWORD', 'MYSQLPASSWORD', ''),
     charset: 'utf8mb4',
   };
   // Cloud SQL via unix socket (Cloud Run / App Engine) or plain TCP (local, Cloud SQL proxy)
   if (process.env.DB_SOCKET) cfg.socketPath = process.env.DB_SOCKET;
   else {
-    cfg.host = process.env.DB_HOST || '127.0.0.1';
-    cfg.port = Number(process.env.DB_PORT || 3306);
+    cfg.host = env('DB_HOST', 'MYSQLHOST', '127.0.0.1');
+    cfg.port = Number(env('DB_PORT', 'MYSQLPORT', 3306));
   }
   return cfg;
 };
@@ -188,9 +190,14 @@ const DEFAULT_PACKAGES = [
 ];
 
 async function init() {
-  const boot = await mysql.createConnection(baseConfig());
-  await boot.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4`);
-  await boot.end();
+  // Hosted databases usually exist already and the user may not be allowed to create one
+  try {
+    const boot = await mysql.createConnection(baseConfig());
+    await boot.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4`);
+    await boot.end();
+  } catch (e) {
+    if (!/denied|ER_DBACCESS|1044|1227/i.test(e.message)) throw e;
+  }
 
   pool = mysql.createPool({
     ...baseConfig(),
