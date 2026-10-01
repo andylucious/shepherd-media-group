@@ -9,13 +9,13 @@ const db = require('../db');
 const pdf = require('../pdf');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-// Without JWT_SECRET a random one is made for this run (everyone is signed out on restart) rather than using a known default.
-const RUN_SECRET = crypto.randomBytes(32).toString('hex');
+const { secret: SECRET, pv, weakPassword, lock, limiter } = require('../util');
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not set: sessions will reset whenever the server restarts.');
-const SECRET = () => process.env.JWT_SECRET || RUN_SECRET;
-const loginLimit = require('../util').limiter({ windowMs: 15 * 60 * 1000, max: 15, message: 'Too many sign-in attempts. Wait 15 minutes and try again.' });
 // On Railway point UPLOADS_DIR at the mounted volume (e.g. /data/uploads) so files survive redeploys
 const UPLOADS = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
+// a real hash to compare against when the account does not exist, so response time does not reveal which emails are registered
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10);
+const loginLimit = limiter({ windowMs: 15 * 60 * 1000, max: 15, message: 'Too many sign-in attempts. Wait 15 minutes and try again.' });
 
 // Recalculate an invoice's paid amount and status from its payment records
 async function syncInvoice(id) {
@@ -31,12 +31,17 @@ async function syncInvoice(id) {
 // ---- auth -------------------------------------------------------------
 router.post('/login', loginLimit, wrap(async (req, res) => {
   const { email = '', password = '' } = req.body || {};
+  const key = 'admin:' + String(email).toLowerCase().trim() + '|' + req.ip; // per email and connection, so a stranger cannot lock the owner out
+  const locked = lock.check(key);
+  if (locked) return res.status(429).json({ error: `Too many wrong passwords. Try again in ${locked} minute(s).` });
   const u = await db.one('SELECT * FROM users WHERE email=?', [String(email).toLowerCase().trim()]);
-  if (!u || !u.active || !(await bcrypt.compare(String(password), u.password_hash)))
-    return res.status(401).json({ error: 'Wrong email or password' });
+  // compare against a dummy hash when the email is unknown so timing does not reveal which emails exist
+  const ok = await bcrypt.compare(String(password), u ? u.password_hash : DUMMY_HASH);
+  if (!u || !u.active || !ok) { lock.fail(key); return res.status(401).json({ error: 'Wrong email or password' }); }
+  lock.ok(key);
   await db.q('UPDATE users SET last_login=NOW() WHERE id=?', [u.id]);
-  const token = jwt.sign({ id: u.id }, SECRET(), { expiresIn: '7d' });
-  res.cookie('smg_admin', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 864e5, secure: req.secure });
+  const token = jwt.sign({ id: u.id, pv: pv(u.password_hash) }, SECRET(), { expiresIn: '7d' });
+  res.cookie('smg_admin', token, { httpOnly: true, sameSite: 'strict', maxAge: 7 * 864e5, secure: req.secure });
   res.json({ name: u.name, email: u.email, role: u.role });
 }));
 
@@ -44,11 +49,12 @@ router.post('/logout', (req, res) => { res.clearCookie('smg_admin'); res.json({ 
 
 // signed-in user is re-read on every request so disabling an account takes effect at once
 const auth = wrap(async (req, res, next) => {
-  let id;
-  try { id = jwt.verify(req.cookies.smg_admin || '', SECRET()).id; }
+  let t;
+  try { t = jwt.verify(req.cookies.smg_admin || '', SECRET()); }
   catch (e) { return res.status(401).json({ error: 'Please sign in' }); }
-  const u = await db.one('SELECT id, name, email, role, active FROM users WHERE id=?', [id]);
-  if (!u || !u.active) return res.status(401).json({ error: 'Please sign in' });
+  const u = await db.one('SELECT id, name, email, role, active, password_hash FROM users WHERE id=?', [t.id]);
+  if (!u || !u.active || t.pv !== pv(u.password_hash)) return res.status(401).json({ error: 'Please sign in' });
+  delete u.password_hash;
   req.user = u;
   next();
 });
@@ -59,10 +65,14 @@ router.use(auth);
 
 router.post('/password', wrap(async (req, res) => {
   const { current = '', next = '' } = req.body || {};
-  if (String(next).length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  const weak = weakPassword(next);
+  if (weak) return res.status(400).json({ error: weak });
   const u = await db.one('SELECT * FROM users WHERE id=?', [req.user.id]);
   if (!(await bcrypt.compare(String(current), u.password_hash))) return res.status(400).json({ error: 'Current password is wrong' });
-  await db.q('UPDATE users SET password_hash=? WHERE id=?', [await bcrypt.hash(String(next), 10), u.id]);
+  const hash = await bcrypt.hash(String(next), 10);
+  await db.q('UPDATE users SET password_hash=? WHERE id=?', [hash, u.id]);
+  // every other session is now invalid; keep this one signed in
+  res.cookie('smg_admin', jwt.sign({ id: u.id, pv: pv(hash) }, SECRET(), { expiresIn: '7d' }), { httpOnly: true, sameSite: 'strict', maxAge: 7 * 864e5, secure: req.secure });
   res.json({ ok: true });
 }));
 

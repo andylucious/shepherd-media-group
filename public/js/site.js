@@ -19,6 +19,13 @@ async function loadSettings() {
   document.querySelectorAll('[data-tel]').forEach((el) => { el.href = 'tel:' + S.phone; });
 }
 
+// Signed-in client: nav says "My account" and the quote form is pre-filled
+let CLIENT = null;
+async function loadClient() {
+  try { CLIENT = await fetch('/api/client/me').then((r) => r.json()); } catch (e) { CLIENT = null; }
+  document.querySelectorAll('[data-account]').forEach((a) => { a.textContent = CLIENT ? 'My account' : 'Sign in'; });
+}
+
 function bindShell() {
   $('.burger')?.addEventListener('click', () => $('nav.main').classList.toggle('open'));
   document.querySelectorAll('nav.main a').forEach((a) => a.addEventListener('click', () => $('nav.main').classList.remove('open')));
@@ -45,6 +52,9 @@ function openQuote(id) {
   const p = packages.find((x) => x.id == id);
   $('#qForm').style.display = ''; $('#qDone').style.display = 'none'; $('#qErr').textContent = '';
   $('#qPkg').innerHTML = packages.map((x) => `<option value="${x.id}" ${x.id == id ? 'selected' : ''}>${esc(x.category)} - ${esc(x.name)} (${kes(x.price)})</option>`).join('');
+  const f = $('#qForm');
+  if (CLIENT) { if (!f.client_name.value) f.client_name.value = CLIENT.name; if (!f.phone.value) f.phone.value = CLIENT.phone; if (!f.email.value) f.email.value = CLIENT.email; }
+  $('#qHint').textContent = CLIENT ? `Signed in as ${CLIENT.name}. This quotation will be saved to your account.` : '';
   $('#quoteModal').classList.add('open');
 }
 async function submitQuote(e) {
@@ -124,7 +134,7 @@ document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.matches('#galMore')) loadMorePhotos();
   else if (t.matches('[data-g]')) filterGallery(t.dataset.g);
-  else if (t.matches('.tab')) { cat = t.dataset.c; renderPackages(); }
+  else if (t.matches('#tabs .tab')) { cat = t.dataset.c; renderPackages(); }
   else if (t.matches('[data-q]')) openQuote(t.dataset.q);
   else if (t.matches('[data-close]') || t.classList.contains('overlay')) t.closest('.overlay').classList.remove('open');
   else if (t.matches('[data-like]')) {
@@ -148,6 +158,7 @@ async function initHome() {
 window.addEventListener('DOMContentLoaded', async () => {
   bindShell();
   await loadSettings();
+  await loadClient();
   if ($('#pkgs')) initHome();
   else if ($('#posts')) loadPosts();
 });

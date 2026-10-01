@@ -17,7 +17,7 @@ async function A(method, url, body) {
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), 2600); }
 const waNum = (p) => { const d = String(p).replace(/\D/g, ''); return d.startsWith('0') ? '254' + d.slice(1) : d; };
 const waUrl = (p, msg) => `https://wa.me/${waNum(p)}?text=${encodeURIComponent(msg || '')}`;
-function modal(html) { $('#ovc').innerHTML = html; $('#ov').classList.add('open'); }
+function modal(html) { $('#ovc').className = 'modal wide'; $('#ovc').innerHTML = html; $('#ov').classList.add('open'); }
 function closeModal() { $('#ov').classList.remove('open'); }
 $('#ov').addEventListener('click', (e) => { if (e.target.id === 'ov' || e.target.matches('[data-close]')) closeModal(); });
 
@@ -31,7 +31,7 @@ $('#lf').addEventListener('submit', async (e) => {
 $('#logout').onclick = async () => { await A('POST', '/logout'); showLogin(); };
 $('#menu').onclick = () => $('#side').classList.toggle('open');
 
-const views = { dash, quotes, invoices, bookings, reminders, payables, projects, reports, users, packages, media, blog, visitors, settings };
+const views = { dash, quotes, invoices, bookings, reminders, payables, contractors, clients, projects, reports, users, packages, media, blog, visitors, settings };
 let ME = {};
 let current = 'dash';
 async function go(v) {
@@ -45,7 +45,7 @@ document.querySelectorAll('.side .nav[data-v]').forEach((b) => (b.onclick = () =
 async function start() {
   ME = await A('GET', '/me');
   document.querySelectorAll('[data-admin]').forEach((b) => b.classList.toggle('hidden', ME.role !== 'admin'));
-  if (ME.role !== 'admin' && ['reports', 'users'].includes(current)) current = 'dash';
+  if (ME.role !== 'admin' && ['reports', 'users', 'contractors', 'clients'].includes(current)) current = 'dash';
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); go(current);
 }
 start().catch(() => showLogin());
@@ -99,7 +99,7 @@ async function quotes() {
     <td>${kes(q.price - q.discount)}</td>
     <td><span class="pill ${q.status === 'new' ? 'red' : q.status === 'invoiced' ? 'green' : ''}">${esc(q.status)}</span></td>
     <td><div class="acts">
-      <a class="btn btn-ghost" href="/api/admin/quotes/${q.id}/pdf">PDF</a>
+      <a class="btn btn-ghost" href="#" data-viewpdf="/api/admin/quotes/${q.id}/pdf" data-title="Quotation ${esc(q.number)}">View</a><a class="btn btn-ghost" href="/api/admin/quotes/${q.id}/pdf">PDF</a>
       <button class="btn btn-ghost" data-edit="${q.id}">Edit</button>
       <a class="btn btn-ghost" target="_blank" href="${waUrl(q.phone, `Hello ${q.client_name}, this is Shepherd Media Group regarding your quotation ${q.number}.`)}">WhatsApp</a>
       ${q.invoice_id ? `<button class="btn btn-blue" data-goinv>View invoice</button>` : `<button class="btn btn-red" data-inv="${q.id}">Make invoice</button>`}

@@ -54,6 +54,7 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
 .hidden { display: none !important; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 999px; z-index: 100; }
 .modal.wide { max-width: 640px; }
+.modal.xl { max-width: 1040px; width: 96vw; }
 #topbar { display: none; }
 @media (max-width: 860px) {
   .app { grid-template-columns: 1fr; }
@@ -88,13 +89,15 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
     <button class="nav" data-v="reminders">Reminders</button>
     <button class="nav" data-v="invoices">Invoices &amp; payments</button>
     <button class="nav" data-v="payables">Payables</button>
+    <button class="nav" data-v="contractors" data-admin>Contractors</button>
     <button class="nav" data-v="projects">Client projects</button>
     <button class="nav" data-v="reports" data-admin>Reports</button>
     <button class="nav" data-v="packages">Packages</button>
     <button class="nav" data-v="media">Gallery &amp; videos</button>
     <button class="nav" data-v="blog">Blog</button>
     <button class="nav" data-v="visitors">Visitors</button>
-    <button class="nav" data-v="users" data-admin>Users</button>
+    <button class="nav" data-v="clients" data-admin>Client accounts</button>
+    <button class="nav" data-v="users" data-admin>Staff users</button>
     <button class="nav" data-v="settings">Settings</button>
     <span style="flex:1"></span>
     <a class="nav btn-sm" href="/" target="_blank" style="padding:11px 14px;color:var(--muted);font-weight:600">View website ↗</a>
@@ -110,6 +113,7 @@ td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: mid
 <div class="overlay" id="ov"><div class="modal wide" id="ovc"></div></div>
 <div class="toast hidden" id="toast"></div>
 <script src="/admin/admin-business.js"></script>
+<script src="/admin/admin-people.js"></script>
 <script src="/admin/admin.js"></script>
 </body>
 </html>

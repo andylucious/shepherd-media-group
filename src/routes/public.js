@@ -5,6 +5,7 @@ const pdf = require('../pdf');
 const docs = require('../docs');
 const { receiptData } = require('../receipts');
 const { bookingStatus, limiter } = require('../util');
+const { clientFromReq } = require('./client');
 
 const formLimit = limiter({ windowMs: 60 * 60 * 1000, max: 12, message: 'Too many requests from this connection. Please try again in an hour, or message us on WhatsApp.' });
 const lookupLimit = limiter({ windowMs: 15 * 60 * 1000, max: 20 });
@@ -105,8 +106,9 @@ router.get('/posts/:slug', wrap(async (req, res) => {
 // ---- quotes -----------------------------------------------------------
 router.post('/quotes', formLimit, wrap(async (req, res) => {
   const b = req.body || {};
-  const name = String(b.client_name || '').trim();
-  const phone = String(b.phone || '').trim();
+  const me = await clientFromReq(req); // signed-in clients get the quote on their account
+  const name = String(b.client_name || (me && me.name) || '').trim();
+  const phone = String(b.phone || (me && me.phone) || '').trim();
   if (!name || phone.length < 7) return res.status(400).json({ error: 'Please enter your name and a valid phone number.' });
   const pkg = await db.one('SELECT * FROM packages WHERE id=? AND active=1', [b.package_id]);
   if (!pkg) return res.status(400).json({ error: 'Please choose a package.' });
@@ -114,11 +116,11 @@ router.post('/quotes', formLimit, wrap(async (req, res) => {
   const number = await db.nextNumber('quotes', 'SMG-Q');
   const token = crypto.randomBytes(24).toString('hex');
   const r = await db.q(
-    `INSERT INTO quotes (number, token, client_name, phone, email, event_type, event_date, venue, package_id, package_name, items, price, notes)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [number, token, name.slice(0, 160), phone.slice(0, 40), String(b.email || '').slice(0, 190), pkg.category,
+    `INSERT INTO quotes (number, token, client_name, phone, email, event_type, event_date, venue, package_id, package_name, items, price, notes, client_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [number, token, name.slice(0, 160), phone.slice(0, 40), String(b.email || (me && me.email) || '').slice(0, 190), pkg.category,
       /^\d{4}-\d{2}-\d{2}$/.test(String(b.event_date || '')) ? b.event_date : '', String(b.venue || '').slice(0, 255), pkg.id, pkg.name, pkg.features, pkg.price,
-      String(b.notes || '').slice(0, 2000)]
+      String(b.notes || '').slice(0, 2000), me ? me.id : null]
   );
   res.json({ id: r.insertId, number, download: `/api/public/quotes/${token}/pdf` });
 }));

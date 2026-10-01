@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('../db');
 
-const { today } = require('../util');
+const { today, weakPassword } = require('../util');
 const crypto2 = require('crypto');
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
 const num = (v) => Number(v) || 0;
@@ -92,6 +92,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     res.json({ ok: true });
   }));
   router.delete('/payables/:id', adminOnly, wrap(async (req, res) => {
+    await db.q('DELETE FROM assignments WHERE payable_id=?', [req.params.id]);
     await db.q('DELETE FROM payable_payments WHERE payable_id=?', [req.params.id]);
     await db.q('DELETE FROM payables WHERE id=?', [req.params.id]);
     res.json({ ok: true });
@@ -152,7 +153,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     const b = req.body;
     const email = String(b.email || '').toLowerCase().trim();
     if (!b.name || !/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Name and a valid email are required' });
-    if (String(b.password || '').length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (weakPassword(b.password)) return res.status(400).json({ error: weakPassword(b.password) });
     if (await db.one('SELECT id FROM users WHERE email=?', [email])) return res.status(400).json({ error: 'That email already has an account' });
     const r = await db.q('INSERT INTO users (email, name, phone, role, password_hash) VALUES (?,?,?,?,?)', [
       email, String(b.name).slice(0, 120), String(b.phone || '').slice(0, 40), ROLES.includes(b.role) ? b.role : 'staff', await bcrypt.hash(String(b.password), 10)]);
@@ -169,7 +170,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     if (id === req.user.id && (role !== 'admin' || !active)) return res.status(400).json({ error: 'You cannot remove your own admin access' });
     await db.q('UPDATE users SET name=?, email=?, phone=?, role=?, active=? WHERE id=?', [String(b.name).slice(0, 120), email, String(b.phone || '').slice(0, 40), role, active, id]);
     if (b.password) {
-      if (String(b.password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      if (weakPassword(b.password)) return res.status(400).json({ error: weakPassword(b.password) });
       await db.q('UPDATE users SET password_hash=? WHERE id=?', [await bcrypt.hash(String(b.password), 10), id]);
     }
     res.json({ ok: true });
@@ -225,6 +226,7 @@ module.exports = (router, { wrap, adminOnly, syncInvoice }) => {
     res.json(await buildSummary(from, to));
   }));
   require('./reports')(router, { wrap, adminOnly, buildSummary, range });
+  require('./people')(router, { wrap, adminOnly });
 
   // cells starting with = + - @ are prefixed so Excel never runs a client-typed name as a formula
   const csvCell = (v) => {

@@ -154,6 +154,38 @@ const SCHEMA = [
     note VARCHAR(500) DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS clients (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(160) NOT NULL,
+    email VARCHAR(190) NOT NULL UNIQUE,
+    phone VARCHAR(40) DEFAULT '',
+    password_hash VARCHAR(100) NOT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    last_login TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS contractors (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(160) NOT NULL,
+    role VARCHAR(40) DEFAULT 'Photographer',
+    phone VARCHAR(40) DEFAULT '',
+    email VARCHAR(190) DEFAULT '',
+    rate VARCHAR(120) DEFAULT '',
+    notes VARCHAR(500) DEFAULT '',
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contractor_id INT NOT NULL,
+    invoice_id INT NULL,
+    job VARCHAR(255) NOT NULL,
+    role VARCHAR(40) DEFAULT '',
+    event_date VARCHAR(20) DEFAULT '',
+    payable_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX (contractor_id), INDEX (invoice_id)
+  ) DEFAULT CHARSET=utf8mb4`,
   `CREATE TABLE IF NOT EXISTS visits (
     id INT AUTO_INCREMENT PRIMARY KEY,
     visitor VARCHAR(40) NOT NULL,
@@ -222,6 +254,7 @@ async function init() {
     if (!c) await pool.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
   };
   await addColumn('packages', 'image', "VARCHAR(255) DEFAULT ''");
+  await addColumn('quotes', 'client_id', 'INT NULL');
   await addColumn('payments', 'receipt_number', "VARCHAR(30) NULL");
   await addColumn('payments', 'token', "VARCHAR(48) NULL");
   await addColumn('invoices', 'completed_at', 'TIMESTAMP NULL DEFAULT NULL');

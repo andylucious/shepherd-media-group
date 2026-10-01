@@ -39,3 +39,39 @@ function limiter({ windowMs, max, message }) {
 }
 
 module.exports = { today, daysBetween, bookingStatus, limiter };
+
+// ---------------------------------------------------------------- security helpers
+const crypto = require('crypto');
+
+// One signing secret for both admin and client sessions. Without JWT_SECRET a random one is made per run.
+const RUN_SECRET = crypto.randomBytes(32).toString('hex');
+const secret = () => process.env.JWT_SECRET || RUN_SECRET;
+
+// Fingerprint of the stored password hash. Put in the session token, so changing a password signs out every old session.
+const pv = (hash) => crypto.createHash('sha256').update(String(hash)).digest('hex').slice(0, 16);
+
+const COMMON = new Set(['password', 'password1', '12345678', '123456789', '1234567890', 'qwerty123', 'qwertyuiop', 'iloveyou', 'admin123', 'letmein123', 'welcome1', 'abc12345', '11111111', '00000000']);
+// Returns an error message for a weak NEW password, or '' when it is acceptable.
+function weakPassword(pw) {
+  const p = String(pw || '');
+  if (p.length < 8) return 'Password must be at least 8 characters.';
+  if (COMMON.has(p.toLowerCase()) || /^(.)\1+$/.test(p)) return 'That password is too easy to guess. Choose another.';
+  if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) return 'Use at least one letter and one number in the password.';
+  return '';
+}
+
+// Per-account sign-in throttle (on top of the per-IP limiter): 6 wrong passwords locks that account for 15 minutes.
+const fails = new Map();
+const lock = {
+  check(key) { const f = fails.get(key); return f && f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 60000) : 0; },
+  fail(key) {
+    if (fails.size > 5000) fails.clear(); // bounded memory if someone sprays random emails
+    const cur = fails.get(key) || { n: 0, until: 0 };
+    cur.n += 1;
+    if (cur.n >= 6) { cur.until = Date.now() + 15 * 60 * 1000; cur.n = 0; }
+    fails.set(key, cur);
+  },
+  ok(key) { fails.delete(key); },
+};
+
+Object.assign(module.exports, { secret, pv, weakPassword, lock });

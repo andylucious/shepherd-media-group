@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My account | Shepherd Media Group</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/img/logo.png">
+<script src="/js/theme.js"></script>
+<link rel="stylesheet" href="/css/site.css">
+<style>
+.chip { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; background: var(--blue-soft); color: var(--blue); }
+.chip.red { background: var(--red-soft); color: var(--red-dark); }
+.chip.green { background: var(--green-soft); color: var(--green); }
+.cardx { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.cardx h3 { margin: 0 0 4px; color: var(--blue); }
+.money { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+.money div { background: var(--blue-soft); border-radius: 10px; padding: 10px 12px; }
+.money b { display: block; font-size: 1.1rem; color: var(--ink); }
+.money span { font-size: .78rem; color: var(--muted); }
+.rows a { display: inline-block; margin: 4px 8px 4px 0; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.authbox { max-width: 460px; margin: 0 auto; }
+.switch { display: flex; gap: 8px; margin-bottom: 16px; }
+@media (max-width: 700px) { .two { grid-template-columns: 1fr; } .money { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/"><img src="/img/logo.png" alt="SMG logo"><span>Shepherd <b>Media</b> Group</span></a>
+  <button class="theme-btn" data-theme-toggle type="button"></button>
+  <button class="burger" aria-label="Menu">☰</button>
+  <nav class="main"><a href="/#packages">Packages</a><a href="/#gallery">Gallery</a><a href="/#about">About</a><a href="/blog.html">Blog</a><a href="/project.html">My project</a><a href="/account.html" data-account>Sign in</a><a class="btn btn-red btn-sm" href="/#packages">Get a quote</a></nav>
+</div></header>
+
+<section><div class="wrap" style="max-width:900px">
+  <!-- signed out -->
+  <div id="guest" class="authbox" style="display:none">
+    <div class="eyebrow">Client area</div>
+    <h2>Your account</h2>
+    <p class="lead">Create a free account to see your quotations, invoices, receipts and project links in one place.</p>
+    <div class="switch"><button class="tab on" data-mode="login">Sign in</button><button class="tab" data-mode="register">Create account</button></div>
+    <form id="loginForm" class="panel-box">
+      <label>Email</label><input name="email" type="email" required autocomplete="username">
+      <label>Password</label><input name="password" type="password" required autocomplete="current-password">
+      <div class="err" id="loginErr"></div>
+      <button class="btn btn-red" type="submit">Sign in</button>
+      <p class="lead" style="font-size:.88rem;margin-bottom:0">Forgot your password? <a data-wa href="#" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">Message us on WhatsApp</a> and we will reset it.</p>
+    </form>
+    <form id="regForm" class="panel-box" style="display:none">
+      <label>Full name</label><input name="name" required autocomplete="name">
+      <label>Email</label><input name="email" type="email" required autocomplete="username">
+      <label>Phone / WhatsApp</label><input name="phone" type="tel" required autocomplete="tel" placeholder="07XX XXX XXX">
+      <label>Password</label><input name="password" type="password" required autocomplete="new-password" minlength="8">
+      <small class="lead">At least 8 characters with a letter and a number.</small>
+      <div class="err" id="regErr"></div>
+      <button class="btn btn-red" type="submit">Create my account</button>
+    </form>
+  </div>
+
+  <!-- signed in -->
+  <div id="home" style="display:none">
+    <div class="eyebrow">Client area</div>
+    <h2 id="hello"></h2>
+    <p><button class="btn btn-ghost btn-sm" id="logout">Sign out</button> <a class="btn btn-red btn-sm" href="/#packages">Request a new quote</a></p>
+    <h3 style="color:var(--blue)">Bookings &amp; invoices</h3>
+    <div id="bookings"></div>
+    <h3 style="color:var(--blue)">Quotations</h3>
+    <div id="quotes"></div>
+    <div class="two" style="margin-top:24px">
+      <form id="claimForm" class="panel-box">
+        <h3 style="margin-top:0;color:var(--blue)">Add an earlier quotation</h3>
+        <p class="lead" style="font-size:.9rem">Already have a quotation or invoice number? Add it to this account.</p>
+        <label>Reference number</label><input name="reference" placeholder="SMG-Q-0001" required>
+        <label>Phone number used on it</label><input name="phone" type="tel" required>
+        <div class="err" id="claimErr"></div><button class="btn btn-blue btn-sm" type="submit">Add to my account</button>
+      </form>
+      <div>
+        <form id="profForm" class="panel-box" style="margin-bottom:16px">
+          <h3 style="margin-top:0;color:var(--blue)">My details</h3>
+          <label>Name</label><input name="name" required><label>Phone</label><input name="phone" type="tel" required>
+          <div class="err" id="profErr"></div><button class="btn btn-blue btn-sm" type="submit">Save</button>
+        </form>
+        <form id="pwForm" class="panel-box">
+          <h3 style="margin-top:0;color:var(--blue)">Change password</h3>
+          <label>Current password</label><input name="current" type="password" required autocomplete="current-password">
+          <label>New password</label><input name="next" type="password" required autocomplete="new-password" minlength="8">
+          <div class="err" id="pwErr"></div><button class="btn btn-blue btn-sm" type="submit">Update password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap"><div class="copy" style="border:0;margin:0">© Shepherd Media Group · <span data-s="phone"></span></div></div></footer>
+<a class="wa" data-wa href="#" target="_blank" rel="noopener">💬 WhatsApp</a>
+<script src="/js/site.js"></script>
+<script>
+const capi = async (url, body, method) => {
+  const r = await fetch('/api/client' + url, { method: method || (body ? 'POST' : 'GET'), headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+};
+const form = (f) => Object.fromEntries(new FormData(f));
+const fmt = (n) => 'KES ' + Number(n || 0).toLocaleString('en-KE');
+const nice = (d) => { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return d; } };
+
+function showGuest() { $('#guest').style.display = ''; $('#home').style.display = 'none'; }
+document.querySelectorAll('.switch .tab').forEach((b) => (b.onclick = () => {
+  document.querySelectorAll('.switch .tab').forEach((x) => x.classList.toggle('on', x === b));
+  $('#loginForm').style.display = b.dataset.mode === 'login' ? '' : 'none';
+  $('#regForm').style.display = b.dataset.mode === 'register' ? '' : 'none';
+}));
+$('#loginForm').onsubmit = async (e) => { e.preventDefault(); $('#loginErr').textContent = ''; try { await capi('/login', form(e.target)); load(); } catch (er) { $('#loginErr').textContent = er.message; } };
+$('#regForm').onsubmit = async (e) => { e.preventDefault(); $('#regErr').textContent = ''; try { await capi('/register', form(e.target)); load(); } catch (er) { $('#regErr').textContent = er.message; } };
+$('#logout').onclick = async () => { await capi('/logout', {}); location.reload(); };
+$('#claimForm').onsubmit = async (e) => { e.preventDefault(); $('#claimErr').textContent = ''; try { await capi('/claim', form(e.target)); e.target.reset(); load(); } catch (er) { $('#claimErr').textContent = er.message; } };
+$('#profForm').onsubmit = async (e) => { e.preventDefault(); $('#profErr').textContent = ''; try { await capi('/me', form(e.target), 'PUT'); $('#profErr').textContent = 'Saved.'; load(); } catch (er) { $('#profErr').textContent = er.message; } };
+$('#pwForm').onsubmit = async (e) => { e.preventDefault(); $('#pwErr').textContent = ''; try { await capi('/password', form(e.target)); e.target.reset(); $('#pwErr').textContent = 'Password updated.'; } catch (er) { $('#pwErr').textContent = er.message; } };
+
+const stChip = (b) => b.code === 'completed' ? '<span class="chip green">Completed</span>'
+  : b.code === 'in_progress' ? '<span class="chip">In progress</span>' : `<span class="chip red">Booked${b.date ? ' · ' + esc(nice(b.date)) : ''}</span>`;
+
+async function load() {
+  let o;
+  try { o = await capi('/overview'); } catch (e) { return showGuest(); }
+  $('#guest').style.display = 'none'; $('#home').style.display = '';
+  $('#hello').textContent = 'Hello, ' + o.client.name.split(' ')[0];
+  $('#profForm').name.value = o.client.name; $('#profForm').phone.value = o.client.phone;
+  $('#bookings').innerHTML = o.invoices.map((i) => `
+    <div class="cardx">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>${esc(i.package_name)}</h3><small class="lead">${esc(i.number)}${i.event_date ? ' · ' + esc(nice(i.event_date)) : ''}${i.venue ? ' · ' + esc(i.venue) : ''}</small></div><div>${stChip(i.booking)}</div></div>
+      <div class="money"><div><b>${fmt(i.total)}</b><span>Total</span></div><div><b>${fmt(i.paid)}</b><span>Paid</span></div><div><b>${fmt(i.balance)}</b><span>Balance${i.due_date && i.balance > 0 ? ' · due ' + esc(nice(i.due_date)) : ''}</span></div></div>
+      <div class="rows"><a class="btn btn-ghost btn-sm" href="/api/client/invoices/${i.id}/pdf">Invoice (PDF)</a>
+        ${i.payments.map((p) => `<a class="btn btn-ghost btn-sm" href="/api/public/receipts/${esc(p.token)}/pdf">Receipt ${esc(p.receipt_number)} · ${fmt(p.amount)}</a>`).join('')}
+        ${i.projects.map((p) => `<a class="btn btn-blue btn-sm" data-view="${p.id}" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Open: ${esc(p.title)} ↗</a>`).join('')}
+        ${i.balance > 0 ? `<a class="btn btn-red btn-sm" target="_blank" rel="noopener" href="${waLink('Hello, I would like to pay the balance for invoice ' + i.number)}">Pay / ask about balance</a>` : ''}</div>
+      ${i.projects.length ? '' : (i.booking.code === 'completed' ? '' : '<p class="lead" style="font-size:.88rem;margin:8px 0 0">Your photos and videos will appear here when they are ready.</p>')}
+    </div>`).join('') || '<div class="empty">No bookings yet. When your quotation is confirmed it appears here as a booking.</div>';
+  $('#quotes').innerHTML = o.quotes.filter((q) => !q.invoice_id).map((q) => `
+    <div class="cardx" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+      <div><b>${esc(q.package_name)}</b> <small class="lead">${esc(q.number)} · ${esc(String(q.created_at).slice(0, 10))}</small><br><span class="lead">${fmt(q.price - q.discount)}</span></div>
+      <a class="btn btn-ghost btn-sm" href="/api/public/quotes/${esc(q.token)}/pdf">Download quotation</a></div>`).join('') || '<div class="empty">No open quotations.</div>';
+}
+document.addEventListener('click', (e) => { const a = e.target.closest('[data-view]'); if (a) fetch(`/api/client/projects/${a.dataset.view}/viewed`, { method: 'POST' }).catch(() => {}); });
+load();
+</script>
+</body>
+</html>

@@ -4,7 +4,8 @@ const today = (off = 0) => new Date(Date.now() + off * 864e5).toLocaleDateString
 const receiptLink = (p) => `${location.origin}/api/public/receipts/${p.token}/pdf`;
 const payRows = (list, delPath, ctx) => list.length ? `<table><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th><th>Receipt</th><th></th></tr>${list.map((p) =>
   `<tr><td>${esc(String(p.paid_at).slice(0, 10))}</td><td>${esc(p.method)}</td><td>${esc(p.reference)}</td><td>${kes(p.amount)}</td>
-   <td>${ctx ? `<small>${esc(p.receipt_number || '')}</small><div class="acts"><a class="btn btn-ghost btn-sm" href="/api/admin/payments/${p.id}/receipt">Download</a>
+   <td>${ctx ? `<small>${esc(p.receipt_number || '')}</small><div class="acts"><a class="btn btn-ghost btn-sm" href="#" data-viewpdf="/api/admin/payments/${p.id}/receipt" data-title="Receipt ${esc(p.receipt_number || '')}">View</a>
+     <a class="btn btn-ghost btn-sm" href="/api/admin/payments/${p.id}/receipt">Download</a>
      <a class="btn btn-ghost btn-sm" target="_blank" href="/api/admin/payments/${p.id}/receipt?inline=1">Print</a>
      <a class="btn btn-ghost btn-sm" target="_blank" href="${waUrl(ctx.phone, `Hello ${ctx.client}, thank you for your payment of ${kes(p.amount)}. Your receipt ${p.receipt_number}: ${receiptLink(p)}  - Shepherd Media Group`)}">Send to client</a></div>` : ''}</td>
    <td>${ME.role === 'admin' ? `<button class="btn btn-del btn-sm" data-undo="${p.id}" data-path="${delPath}">Undo</button>` : ''}</td></tr>`).join('')}</table>` : '<p class="lead" style="margin:6px 0">No payments yet.</p>';
@@ -42,7 +43,7 @@ async function invoices() {
     <td>${esc(i.package_name)}</td><td>${kes(i.amount - i.discount)}</td><td>${kes(i.paid)}</td><td><b>${kes(bal)}</b></td><td>${esc(i.due_date)}${late(i) ? '<br><small style="color:var(--red)">overdue</small>' : ''}</td>
     <td><span class="pill ${i.status === 'paid' ? 'green' : i.status === 'partial' ? '' : 'red'}">${esc(i.status)}</span></td>
     <td><div class="acts"><button class="btn btn-red" data-pay="${i.id}">${i.status === 'paid' ? 'Payments & receipts' : 'Add payment'}</button>
-      <a class="btn btn-ghost" href="/api/admin/invoices/${i.id}/pdf">PDF</a>
+      <a class="btn btn-ghost" href="#" data-viewpdf="/api/admin/invoices/${i.id}/pdf" data-title="Invoice ${esc(i.number)}">View</a><a class="btn btn-ghost" href="/api/admin/invoices/${i.id}/pdf">PDF</a>
       <button class="btn btn-ghost" data-edit="${i.id}">Edit</button>
       <a class="btn btn-ghost" target="_blank" href="${waUrl(i.phone, `Hello ${i.client_name}, invoice ${i.number}: total ${kes(i.amount - i.discount)}, paid ${kes(i.paid)}, balance ${kes(bal)}. Thank you. Shepherd Media Group.`)}">WhatsApp</a>
       ${ME.role === 'admin' ? `<button class="btn btn-del" data-del="${i.id}">Delete</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9">No invoices yet. Open a quote and press "Make invoice".</td></tr>'}
@@ -165,8 +166,10 @@ async function reports() {
       ['outstanding', 'Outstanding invoices', 'Who still owes you, with overdue marked (as at today)', 0],
       ['pending-bookings', 'Pending bookings', 'Booked and in-progress jobs not yet completed (as at today)', 0],
       ['expenses', 'Expenses paid', 'Every payment made to suppliers in the period', 'expenses'],
-      ['payables', 'Payables', 'Open bills you still owe (as at today)', 0]].map(([t, name, desc, c]) => `<tr><td><b>${name}</b><br><small>${desc}</small></td>
-      <td><div class="acts" style="justify-content:flex-end"><a class="btn btn-red" href="${pdf(t)}">Download PDF</a><a class="btn btn-ghost" target="_blank" href="${pdf(t, 1)}">Print</a>${typeof c === 'string' ? `<a class="btn btn-ghost" href="${csv(c)}">CSV</a>` : ''}</div></td></tr>`).join('')}</table></div>
+      ['payables', 'Payables', 'Open bills you still owe (as at today)', 0],
+      ['money-owed', 'Money owed', 'Who owes you (clients) and who you owe (contractors and suppliers), with net position', 0],
+      ['contractors', 'Contractors', 'Freelance crew: jobs, fees agreed, paid and still owed', 0]].map(([t, name, desc, c]) => `<tr><td><b>${name}</b><br><small>${desc}</small></td>
+      <td><div class="acts" style="justify-content:flex-end"><a class="btn btn-blue" href="#" data-viewpdf="${pdf(t)}" data-title="${name}">View</a><a class="btn btn-red" href="${pdf(t)}">Download PDF</a><a class="btn btn-ghost" target="_blank" href="${pdf(t, 1)}">Print</a>${typeof c === 'string' ? `<a class="btn btn-ghost" href="${csv(c)}">CSV</a>` : ''}</div></td></tr>`).join('')}</table></div>
   <div class="cards">${stat(kes(r.invoiced), 'Invoiced (sales)')}${stat(kes(r.collected), 'Money received')}${stat(kes(r.expenses), 'Expenses paid')}${stat(kes(r.net), 'Net cash', r.net < 0 ? 'r' : '')}</div>
   <div class="cards">${stat(kes(r.receivable), 'Clients still owe you', 'r')}${stat(kes(r.overdueRecv), 'of which overdue')}${stat(kes(r.payable), 'You owe suppliers', 'r')}${stat(kes(r.overduePay), 'of which overdue')}${stat(`${r.quotesInvoiced}/${r.quotes}`, 'Quotes turned into invoices')}</div>
   <div class="panel"><h3>By month</h3><p class="legend lead" style="margin:0"><span style="background:var(--blue)"></span>Invoiced<span style="background:#2fa866"></span>Received<span style="background:var(--red)"></span>Expenses</p>
@@ -195,7 +198,7 @@ async function users() {
     modal(`<h3>${u.id ? 'Edit' : 'New'} user</h3><form id="ef">
       ${fld('Full name', 'name', u.name, 'text', 'required')}${fld('Email (used to sign in)', 'email', u.email, 'email', 'required')}${fld('Phone', 'phone', u.phone)}
       <div class="row2">${sel('Role', 'role', ['staff', 'admin'], u.role || 'staff')}${sel('Status', 'active', ['Active', 'Disabled'], u.active === 0 ? 'Disabled' : 'Active')}</div>
-      ${fld(u.id ? 'New password (leave empty to keep)' : 'Password (8+ characters)', 'password', '', 'password', u.id ? '' : 'required')}
+      ${fld(u.id ? 'New password (leave empty to keep)' : 'Password (8+ characters, with a letter and a number)', 'password', '', 'password', u.id ? '' : 'required')}
       <div style="margin-top:14px;display:flex;gap:10px"><button class="btn btn-red">Save</button><button type="button" class="btn btn-ghost" data-close>Cancel</button></div></form>`);
     $('#ef').onsubmit = async (ev) => {
       ev.preventDefault();
@@ -229,21 +232,23 @@ async function bookings() {
   $('#main').innerHTML = `<h2>Bookings</h2>
   <p class="lead" style="margin-top:-8px"><b>Booked</b> shows the shoot date until the event day. After that the job is <b>In progress</b> until you send the project link, which marks it <b>Completed</b>.</p>
   <div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${bookingFilter === k ? 'on' : ''}" data-f="${k}">${l} (${count(k)})</button>`).join('')}
-    <span style="flex:1"></span><a class="btn btn-ghost btn-sm" href="/api/admin/bookings/pdf">Pending bookings PDF</a><a class="btn btn-ghost btn-sm" target="_blank" href="/api/admin/bookings/pdf?inline=1">Print</a></div>
-  <div class="panel"><table><tr><th>Status</th><th>Client</th><th>Event</th><th>Package</th><th>Invoice</th><th>Balance</th><th>Project link</th><th></th></tr>
+    <span style="flex:1"></span><a class="btn btn-blue btn-sm" href="#" data-viewpdf="/api/admin/bookings/pdf" data-title="Pending bookings">View pending bookings</a><a class="btn btn-ghost btn-sm" href="/api/admin/bookings/pdf">Download PDF</a><a class="btn btn-ghost btn-sm" target="_blank" href="/api/admin/bookings/pdf?inline=1">Print</a></div>
+  <div class="panel"><table><tr><th>Status</th><th>Client</th><th>Event</th><th>Package</th><th>Invoice</th><th>Crew</th><th>Balance</th><th>Project link</th><th></th></tr>
   ${rows.map((b) => `<tr><td>${bookingPill(b)}</td><td>${esc(b.client_name)}<br><small>${esc(b.phone)}</small></td>
     <td>${esc(b.event_type)}<br><small>${esc(b.event_date || 'Date to be confirmed')}${b.venue ? ' · ' + esc(b.venue) : ''}</small></td><td>${esc(b.package_name)}</td>
-    <td>${esc(b.number)}</td><td>${b.balance > 0.005 ? `<b>${kes(b.balance)}</b>` : '<span class="pill green">Paid</span>'}</td><td>${deliveryPill(b)}</td>
+    <td>${esc(b.number)}</td><td>${b.crew.map((c) => `<small>${esc(c.name)}<br>(${esc(c.role)})</small>`).join('<br>') || '<small>-</small>'}</td><td>${b.balance > 0.005 ? `<b>${kes(b.balance)}</b>` : '<span class="pill green">Paid</span>'}</td><td>${deliveryPill(b)}</td>
     <td><div class="acts">${b.delivered ? '' : `<button class="btn btn-red" data-send="${b.id}">Send project link</button>`}
       ${b.booking.code === 'completed' && !b.delivered ? `<button class="btn btn-ghost" data-reopen="${b.id}">Reopen</button>` : ''}
       ${b.booking.code !== 'completed' ? `<button class="btn btn-ghost" data-done="${b.id}">Mark completed</button>` : ''}
-      <a class="btn btn-ghost" target="_blank" data-remind="${b.id}" data-type="event" href="${waUrl(b.phone, eventMsg(b))}">Remind</a></div></td></tr>`).join('') || '<tr><td colspan="8">Nothing here.</td></tr>'}
+      ${ME.role === 'admin' ? `<button class="btn btn-ghost" data-crew="${b.id}">Assign crew</button>` : ''}
+      <a class="btn btn-ghost" target="_blank" data-remind="${b.id}" data-type="event" href="${waUrl(b.phone, eventMsg(b))}">Remind</a></div></td></tr>`).join('') || '<tr><td colspan="9">Nothing here.</td></tr>'}
   </table></div>`;
   $('#main').onclick = async (e) => {
     const t = e.target;
     if (t.dataset.f) { bookingFilter = t.dataset.f; bookings(); }
     if (t.dataset.done) { await A('POST', `/invoices/${t.dataset.done}/complete`); toast('Marked completed'); bookings(); }
     if (t.dataset.reopen) { await A('POST', `/invoices/${t.dataset.reopen}/reopen`); toast('Reopened'); bookings(); }
+    if (t.dataset.crew) assignModal(null, () => bookings(), t.dataset.crew);
     if (t.dataset.send) { const b = all.find((x) => x.id == t.dataset.send); window.__prefillProject = { client_name: b.client_name, phone: b.phone, number: b.number, package_name: b.package_name }; go('projects'); }
     if (t.dataset.remind) A('POST', `/invoices/${t.dataset.remind}/reminded`, { type: t.dataset.type });
   };

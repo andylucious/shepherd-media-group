@@ -15,7 +15,7 @@
   <button class="theme-btn" data-theme-toggle type="button"></button>
   <button class="burger" aria-label="Menu">☰</button>
   <nav class="main">
-    <a href="#packages">Packages</a><a href="#gallery">Gallery</a><a href="#about">About</a><a href="#blog">Blog</a><a href="/project.html">My project</a>
+    <a href="#packages">Packages</a><a href="#gallery">Gallery</a><a href="#about">About</a><a href="#blog">Blog</a><a href="/project.html">My project</a><a href="/account.html" data-account>Sign in</a>
     <a class="btn btn-red btn-sm" href="#packages">Get a quote</a>
   </nav>
 </div></header>
@@ -84,7 +84,7 @@
     <div class="cols">
       <div><h4 data-s="company_name"></h4><p data-s="tagline"></p><p data-s="address"></p></div>
       <div><h4>Contact</h4><p><a data-tel href="#"><span data-s="phone"></span></a></p><p><a data-wa href="#" target="_blank" rel="noopener">WhatsApp us</a></p><p data-s="email"></p></div>
-      <div><h4>Explore</h4><p><a href="#packages">Packages</a></p><p><a href="#gallery">Gallery</a></p><p><a href="/blog.html">Blog</a></p><p><a href="/project.html">My project</a></p></div>
+      <div><h4>Explore</h4><p><a href="#packages">Packages</a></p><p><a href="#gallery">Gallery</a></p><p><a href="/blog.html">Blog</a></p><p><a href="/project.html">My project</a></p><p><a href="/account.html">Client account</a></p></div>
     </div>
     <div class="copy">© <span id="yr"></span> Shepherd Media Group. All rights reserved.</div>
   </div>
@@ -95,7 +95,7 @@
 <div class="overlay" id="quoteModal"><div class="modal">
   <form id="qForm">
     <h3>Get your quotation</h3>
-    <p class="lead" style="margin:0">Fill in your details and download your A4 quotation right away.</p>
+    <p class="lead" style="margin:0">Fill in your details and download your A4 quotation right away. <a href="/account.html" style="color:var(--blue);text-decoration:underline">Create a free account</a> to keep all your quotes and receipts in one place.</p>
     <label>Package</label><select name="package_id" id="qPkg" required></select>
     <label>Your name</label><input name="client_name" required>
     <div class="row2">
@@ -107,6 +107,7 @@
       <div><label>Venue</label><input name="venue"></div>
     </div>
     <label>Anything else we should know?</label><textarea name="notes" rows="3"></textarea>
+    <div class="lead" id="qHint" style="font-size:.85rem;margin:4px 0"></div>
     <div class="err" id="qErr"></div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-red" type="submit">Generate quotation</button>
